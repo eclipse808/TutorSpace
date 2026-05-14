@@ -1,0 +1,257 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      Role     @default(STUDENT)
+  avatar    String?
+  xp        Int      @default(0)
+  level     Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tutorProfile   TutorProfile?
+  studentProfile StudentProfile?
+  notifications  Notification[]
+}
+
+enum Role {
+  STUDENT
+  TUTOR
+  ADMIN
+}
+
+enum TutorStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model TutorProfile {
+  id          String      @id @default(cuid())
+  userId      String      @unique
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bio         String?
+  subjects    String[]
+  hourlyRate  Float?
+  experience  Int?
+  rating      Float       @default(0)
+  reviewCount Int         @default(0)
+  photoUrl        String?
+  education       String?
+  certificateUrls String[]
+  status          TutorStatus @default(PENDING)
+
+  sessions             Session[]
+  criteria             CompetencyCriteria[]
+  goals                Goal[]
+  reviews              Review[]
+  subjectRequests      SubjectRequest[]
+  profileChangeRequests ProfileChangeRequest[]
+}
+
+model StudentProfile {
+  id       String  @id @default(cuid())
+  userId   String  @unique
+  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  grade    String?
+  photoUrl String?
+
+  sessions            Session[]
+  competencyScores    CompetencyScore[]
+  studentAchievements StudentAchievement[]
+  goals               Goal[]
+  reviews             Review[]
+}
+
+model Session {
+  id               String        @id @default(cuid())
+  tutorProfileId   String
+  studentProfileId String
+  scheduledAt      DateTime
+  duration         Int           @default(60)
+  subject          String
+  status           SessionStatus @default(SCHEDULED)
+  notes            String?
+  createdAt        DateTime      @default(now())
+
+  tutorProfile     TutorProfile    @relation(fields: [tutorProfileId], references: [id])
+  studentProfile   StudentProfile  @relation(fields: [studentProfileId], references: [id])
+  competencyScores CompetencyScore[]
+  review           Review?
+}
+
+enum SessionStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+model CompetencyCriteria {
+  id             String       @id @default(cuid())
+  tutorProfileId String
+  tutorProfile   TutorProfile @relation(fields: [tutorProfileId], references: [id], onDelete: Cascade)
+  name           String
+  subject        String
+  description    String?
+  orderIndex     Int          @default(0)
+
+  scores CompetencyScore[]
+}
+
+model CompetencyScore {
+  id               String   @id @default(cuid())
+  studentProfileId String
+  criteriaId       String
+  sessionId        String?
+  score            Float
+  note             String?
+  scoredAt         DateTime @default(now())
+
+  studentProfile StudentProfile     @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  criteria       CompetencyCriteria @relation(fields: [criteriaId], references: [id], onDelete: Cascade)
+  session        Session?           @relation(fields: [sessionId], references: [id])
+}
+
+model Achievement {
+  id               String          @id @default(cuid())
+  name             String
+  description      String
+  icon             String
+  type             AchievementType
+  threshold        Float?
+  sessionsRequired Int?
+
+  studentAchievements StudentAchievement[]
+}
+
+enum AchievementType {
+  SCORE_MILESTONE
+  ATTENDANCE
+  STREAK
+  SPECIAL
+}
+
+model StudentAchievement {
+  id               String   @id @default(cuid())
+  studentProfileId String
+  achievementId    String
+  earnedAt         DateTime @default(now())
+
+  studentProfile StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  achievement    Achievement    @relation(fields: [achievementId], references: [id])
+
+  @@unique([studentProfileId, achievementId])
+}
+
+model Goal {
+  id                  String         @id @default(cuid())
+  tutorProfileId      String
+  studentProfileId    String
+  subject             String
+  title               String
+  description         String?
+  difficulty          GoalDifficulty @default(MEDIUM)
+  xpReward            Int
+  completed           Boolean        @default(false)
+  completedAt         DateTime?
+  pendingConfirmation Boolean        @default(false)
+  createdAt           DateTime       @default(now())
+
+  tutorProfile   TutorProfile   @relation(fields: [tutorProfileId], references: [id], onDelete: Cascade)
+  studentProfile StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+}
+
+model SubjectRequest {
+  id             String               @id @default(cuid())
+  tutorProfileId String
+  subject        String
+  justification  String
+  certificateUrl String?
+  status         SubjectRequestStatus @default(PENDING)
+  adminNote      String?
+  createdAt      DateTime             @default(now())
+  reviewedAt     DateTime?
+
+  tutorProfile TutorProfile @relation(fields: [tutorProfileId], references: [id], onDelete: Cascade)
+}
+
+enum SubjectRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum GoalDifficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  read      Boolean          @default(false)
+  type      NotificationType @default(INFO)
+  link      String?
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ProfileChangeRequest {
+  id             String              @id @default(cuid())
+  tutorProfileId String
+  bio            String?
+  education      String?
+  experience     Int?
+  status         ProfileChangeStatus @default(PENDING)
+  adminNote      String?
+  createdAt      DateTime            @default(now())
+  reviewedAt     DateTime?
+
+  tutorProfile TutorProfile @relation(fields: [tutorProfileId], references: [id], onDelete: Cascade)
+}
+
+enum ProfileChangeStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Review {
+  id               String   @id @default(cuid())
+  tutorProfileId   String
+  studentProfileId String
+  sessionId        String?  @unique
+  rating           Int
+  text             String?
+  tutorReply       String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  tutorProfile   TutorProfile   @relation(fields: [tutorProfileId], references: [id], onDelete: Cascade)
+  studentProfile StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  session        Session?       @relation(fields: [sessionId], references: [id])
+
+  @@unique([studentProfileId, tutorProfileId])
+}
