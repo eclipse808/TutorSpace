@@ -23,6 +23,9 @@ Thumbs.db
 .vscode/settings.json
 .idea/
 
+# Claude Code
+.claude/
+
 # Docker volumes (local data)
 postgres_data/
 uploads/
