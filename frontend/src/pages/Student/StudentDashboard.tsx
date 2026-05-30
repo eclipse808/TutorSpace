@@ -48,6 +48,7 @@ export default function StudentDashboard() {
   const [earnedAchievements, setEarnedAchievements] = useState<(Achievement & { earnedAt: string })[]>([]);
   const [loading, setLoading] = useState(true);
   const [photoUrl, setPhotoUrl] = useState('');
+  const [studentProfileId, setStudentProfileId] = useState('');
 
   // Avatar dialog
   const [avatarDialog, setAvatarDialog] = useState(false);
@@ -63,7 +64,10 @@ export default function StudentDashboard() {
       api.get('/progress/stats').then((r) => setStats(r.data)),
       api.get('/sessions?status=SCHEDULED').then((r) => setUpcoming(r.data.slice(0, 3))),
       api.get('/progress/achievements').then((r) => setEarnedAchievements(r.data.earned || [])).catch(() => {}),
-      api.get('/auth/me').then((r) => setPhotoUrl(r.data.studentProfile?.photoUrl || '')).catch(() => {}),
+      api.get('/auth/me').then((r) => {
+        setPhotoUrl(r.data.studentProfile?.photoUrl || '');
+        setStudentProfileId(r.data.studentProfile?.id || '');
+      }).catch(() => {}),
     ]).finally(() => setLoading(false));
   }, []);
 
@@ -137,12 +141,22 @@ export default function StudentDashboard() {
             </Box>
             <Box sx={{ flex: 1 }}>
               <Typography variant="h5" fontWeight={700} sx={{ color: 'white' }}>
-                {user?.name} 🎒
+                {user?.name}
               </Typography>
               <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.75)', mt: 0.25 }}>
                 Ученик · Уровень {level} · {xp} XP
               </Typography>
             </Box>
+            {studentProfileId && (
+              <Button
+                component={Link}
+                to={`/students/${studentProfileId}`}
+                size="small"
+                sx={{ color: 'rgba(255,255,255,0.85)', borderColor: 'rgba(255,255,255,0.4)', border: '1px solid', borderRadius: 2, px: 1.5, py: 0.5, fontSize: 12, flexShrink: 0, '&:hover': { bgcolor: 'rgba(255,255,255,0.15)' } }}
+              >
+                Мой профиль
+              </Button>
+            )}
           </Stack>
         </CardContent>
       </Card>
@@ -181,9 +195,18 @@ export default function StudentDashboard() {
             <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)' }}>{li.xpForLevel} XP</Typography>
           </Stack>
           <Stack direction="row" spacing={3} sx={{ mt: 2, pt: 2, borderTop: '1px solid rgba(255,255,255,0.15)' }}>
-            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>🎓 За занятие: +20 XP</Typography>
-            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>⚡ Серия: +10 XP</Typography>
-            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>🎯 Задания: +15–50 XP</Typography>
+            <Stack direction="row" alignItems="center" spacing={0.5}>
+              <MenuBookIcon sx={{ fontSize: 13, color: 'rgba(255,255,255,0.7)' }} />
+              <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>За занятие: +20 XP</Typography>
+            </Stack>
+            <Stack direction="row" alignItems="center" spacing={0.5}>
+              <BoltIcon sx={{ fontSize: 13, color: '#fbbf24' }} />
+              <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>Серия: +10 XP</Typography>
+            </Stack>
+            <Stack direction="row" alignItems="center" spacing={0.5}>
+              <TrackChangesIcon sx={{ fontSize: 13, color: 'rgba(255,255,255,0.7)' }} />
+              <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>Задания: +15–50 XP</Typography>
+            </Stack>
           </Stack>
         </CardContent>
       </Card>
@@ -229,8 +252,8 @@ export default function StudentDashboard() {
                 <Stack spacing={1.5}>
                   {upcoming.map((s) => (
                     <Box key={s.id} sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 1.5, bgcolor: '#F7F5FC', borderRadius: 2 }}>
-                      <Avatar sx={{ bgcolor: '#EEE9F8', color: LAVENDER, width: 40, height: 40, fontSize: 12, fontWeight: 700 }}>
-                        {s.tutorProfile?.user.avatar}
+                      <Avatar src={s.tutorProfile?.photoUrl || undefined} sx={{ bgcolor: '#EEE9F8', color: LAVENDER, width: 40, height: 40, fontSize: 12, fontWeight: 700 }}>
+                        {s.tutorProfile?.user.avatar || s.tutorProfile?.user.name?.slice(0, 2).toUpperCase()}
                       </Avatar>
                       <Box sx={{ flex: 1, minWidth: 0 }}>
                         <Typography variant="body2" fontWeight={600} noWrap>{s.tutorProfile?.user.name}</Typography>

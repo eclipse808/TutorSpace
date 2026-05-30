@@ -5,6 +5,7 @@ import {
   ToggleButtonGroup, ToggleButton, Stack, InputAdornment, IconButton,
 } from '@mui/material';
 import SchoolIcon from '@mui/icons-material/School';
+import BackpackIcon from '@mui/icons-material/Backpack';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import api from '../../api/client';
@@ -76,8 +77,8 @@ export default function Register() {
                       '& .Mui-selected': { bgcolor: '#F0EBF8 !important', color: 'primary.main', borderColor: 'primary.main !important' },
                     }}
                   >
-                    <ToggleButton value="STUDENT">🎒 Ученик</ToggleButton>
-                    <ToggleButton value="TUTOR">🎓 Репетитор</ToggleButton>
+                    <ToggleButton value="STUDENT" sx={{ gap: 0.75 }}><BackpackIcon fontSize="small" /> Ученик</ToggleButton>
+                    <ToggleButton value="TUTOR" sx={{ gap: 0.75 }}><SchoolIcon fontSize="small" /> Репетитор</ToggleButton>
                   </ToggleButtonGroup>
                   {form.role === 'TUTOR' && (
                     <Typography variant="caption" color="text.disabled" sx={{ display: 'block', mt: 1 }}>

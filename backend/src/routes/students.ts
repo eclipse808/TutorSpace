@@ -25,6 +25,7 @@ studentsRouter.get('/:id/public', async (req, res): Promise<void> => {
   res.json({
     id: studentProfile.id,
     user: studentProfile.user,
+    photoUrl: studentProfile.photoUrl,
     completedSessions,
     achievements: achievements.map((a) => ({ ...a.achievement, earnedAt: a.earnedAt })),
   });

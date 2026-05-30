@@ -112,9 +112,10 @@ export default function TutorReviews() {
                   <Avatar
                     component={Link}
                     to={`/students/${review.studentProfileId}`}
+                    src={review.studentProfile?.photoUrl || undefined}
                     sx={{ width: 44, height: 44, bgcolor: LAVENDER_BG, color: LAVENDER, fontWeight: 700, textDecoration: 'none', cursor: 'pointer', transition: 'opacity 0.2s', '&:hover': { opacity: 0.8 } }}
                   >
-                    {review.studentProfile?.user.avatar || review.studentProfile?.user.name?.[0]}
+                    {review.studentProfile?.user.name?.slice(0, 2).toUpperCase() || '?'}
                   </Avatar>
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Stack direction="row" justifyContent="space-between" alignItems="flex-start" flexWrap="wrap" gap={1}>

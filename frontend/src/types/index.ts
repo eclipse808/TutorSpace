@@ -39,6 +39,7 @@ export interface StudentProfile {
   id: string;
   userId: string;
   user: Pick<User, 'id' | 'name' | 'email' | 'avatar'>;
+  photoUrl?: string;
   grade?: string;
 }
 

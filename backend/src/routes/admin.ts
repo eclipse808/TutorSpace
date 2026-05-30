@@ -67,6 +67,41 @@ adminRouter.put('/tutors/:id/reject', requireAdmin, async (req: Request, res: Re
   }
 });
 
+// PUT /admin/tutors/:id/suspend — suspend approved tutor back to PENDING review
+adminRouter.put('/tutors/:id/suspend', requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const tutor = await prisma.tutorProfile.findUnique({
+      where: { id: req.params.id },
+      include: { user: { select: { id: true, name: true, email: true } } },
+    });
+    if (!tutor) { res.status(404).json({ error: 'Not found' }); return; }
+
+    const reason = (req as AuthRequest).body?.reason || '';
+
+    const [updated] = await Promise.all([
+      prisma.tutorProfile.update({
+        where: { id: req.params.id },
+        data: { status: 'PENDING' },
+        include: { user: { select: { id: true, name: true, email: true } } },
+      }),
+      prisma.notification.create({
+        data: {
+          userId: tutor.user.id,
+          type: 'WARNING',
+          title: 'Ваш профиль приостановлен',
+          message: `Ваш аккаунт репетитора отправлен на повторное рассмотрение.${reason ? ` Причина: ${reason}` : ' Свяжитесь с администратором для уточнения.'}`,
+          link: '/tutor/pending',
+        },
+      }),
+    ]);
+
+    res.json(updated);
+  } catch (err) {
+    console.error('Admin suspend error:', err);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
 // GET /admin/profile-changes — pending profile change requests
 adminRouter.get('/profile-changes', requireAdmin, async (_req: Request, res: Response): Promise<void> => {
   try {
@@ -89,7 +124,10 @@ adminRouter.get('/profile-changes', requireAdmin, async (_req: Request, res: Res
 // PUT /admin/profile-changes/:id/approve
 adminRouter.put('/profile-changes/:id/approve', requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
-    const change = await prisma.profileChangeRequest.findUnique({ where: { id: req.params.id } });
+    const change = await prisma.profileChangeRequest.findUnique({
+      where: { id: req.params.id },
+      include: { tutorProfile: { select: { userId: true } } },
+    });
     if (!change) { res.status(404).json({ error: 'Not found' }); return; }
 
     const updateData: Record<string, any> = {};
@@ -105,7 +143,7 @@ adminRouter.put('/profile-changes/:id/approve', requireAdmin, async (req: Reques
       prisma.tutorProfile.update({ where: { id: change.tutorProfileId }, data: updateData }),
       prisma.notification.create({
         data: {
-          userId: (await prisma.tutorProfile.findUnique({ where: { id: change.tutorProfileId }, select: { userId: true } }))!.userId,
+          userId: change.tutorProfile.userId,
           type: 'SUCCESS',
           title: 'Изменения профиля одобрены',
           message: 'Ваши изменения профиля успешно применены.',

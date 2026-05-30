@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Box, Typography, TextField, Button, Chip, Card, CardContent,
   Grid, Collapse, Stack, InputAdornment, Select, MenuItem, FormControl, InputLabel,
@@ -11,16 +12,22 @@ import { PageLoader } from '../../components/Common/LoadingSpinner';
 import api from '../../api/client';
 
 export default function TutorList() {
+  const [searchParams] = useSearchParams();
   const [tutors, setTutors] = useState<TutorProfile[]>([]);
   const [subjects, setSubjects] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
 
   const [search, setSearch] = useState('');
-  const [selectedSubject, setSelectedSubject] = useState('');
+  const [selectedSubject, setSelectedSubject] = useState(() => searchParams.get('subject') || '');
   const [minRate, setMinRate] = useState('');
   const [maxRate, setMaxRate] = useState('');
   const [minRating, setMinRating] = useState('');
+  const [sortOrder, setSortOrder] = useState<'rating_desc' | 'price_asc' | 'price_desc'>('rating_desc');
+
+  useEffect(() => {
+    setSelectedSubject(searchParams.get('subject') || '');
+  }, [searchParams]);
 
   const fetchTutors = async () => {
     setLoading(true);
@@ -42,7 +49,13 @@ export default function TutorList() {
   useEffect(() => { fetchTutors(); }, [selectedSubject, minRating]);
 
   const handleSearch = (e: React.FormEvent) => { e.preventDefault(); fetchTutors(); };
-  const resetFilters = () => { setSearch(''); setSelectedSubject(''); setMinRate(''); setMaxRate(''); setMinRating(''); };
+  const sortedTutors = [...tutors].sort((a, b) => {
+    if (sortOrder === 'price_asc') return (a.hourlyRate ?? 99999) - (b.hourlyRate ?? 99999);
+    if (sortOrder === 'price_desc') return (b.hourlyRate ?? 0) - (a.hourlyRate ?? 0);
+    return b.rating - a.rating;
+  });
+
+  const resetFilters = () => { setSearch(''); setSelectedSubject(''); setMinRate(''); setMaxRate(''); setMinRating(''); setSortOrder('rating_desc'); };
   const hasActiveFilters = !!(selectedSubject || minRate || maxRate || minRating);
 
   return (
@@ -96,6 +109,16 @@ export default function TutorList() {
                   </Select>
                 </FormControl>
               </Grid>
+              <Grid item xs={12} sm={4}>
+                <FormControl fullWidth>
+                  <InputLabel>Сортировка</InputLabel>
+                  <Select value={sortOrder} label="Сортировка" onChange={(e) => setSortOrder(e.target.value as any)}>
+                    <MenuItem value="rating_desc">По рейтингу</MenuItem>
+                    <MenuItem value="price_asc">Цена: по возрастанию</MenuItem>
+                    <MenuItem value="price_desc">Цена: по убыванию</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
             </Grid>
             <Stack direction="row" spacing={1.5} sx={{ mt: 2 }}>
               <Button variant="contained" onClick={fetchTutors} size="small">Применить</Button>
@@ -134,7 +157,7 @@ export default function TutorList() {
         </Box>
       ) : (
         <Grid container spacing={2.5}>
-          {tutors.map((t) => (
+          {sortedTutors.map((t) => (
             <Grid item xs={12} sm={6} md={4} key={t.id}>
               <TutorCard tutor={t} />
             </Grid>

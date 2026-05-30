@@ -154,9 +154,10 @@ export default function MySessions() {
                     <Avatar
                       component={Link}
                       to={`/tutors/${session.tutorProfileId}`}
+                      src={session.tutorProfile?.photoUrl || undefined}
                       sx={{ bgcolor: LAVENDER_BG, color: LAVENDER, width: 48, height: 48, fontWeight: 700, flexShrink: 0, textDecoration: 'none', cursor: 'pointer', transition: 'opacity 0.2s', '&:hover': { opacity: 0.8 } }}
                     >
-                      {session.tutorProfile?.user.avatar || '?'}
+                      {session.tutorProfile?.user.avatar || session.tutorProfile?.user.name?.slice(0, 2).toUpperCase() || '?'}
                     </Avatar>
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                       <Stack direction="row" justifyContent="space-between" alignItems="flex-start" flexWrap="wrap" gap={1}>

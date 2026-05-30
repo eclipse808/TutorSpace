@@ -45,7 +45,7 @@ interface Review {
   text?: string;
   tutorReply?: string;
   createdAt: string;
-  studentProfile: { id: string; user: { name: string; avatar?: string } };
+  studentProfile: { id: string; photoUrl?: string; user: { name: string; avatar?: string } };
 }
 
 interface TutorWithStats extends TutorProfileType {
@@ -233,25 +233,27 @@ export default function TutorProfile() {
                       <Typography variant="h6" fontWeight={600}>Уровень репетитора</Typography>
                     </Stack>
                     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={3} alignItems={{ sm: 'center' }}>
-                      <Box sx={{ flex: 1 }}>
-                        <Stack direction="row" alignItems="center" spacing={1.5} mb={1}>
-                          <Chip label={`${lvl.level} — ${lvl.name}`} size="small" sx={{ bgcolor: LAVENDER_BG, color: LAVENDER, fontWeight: 700 }} />
-                          <Chip label={`${xp} XP`} size="small" sx={{ bgcolor: '#F7F5FC', color: '#9B83CF' }} />
-                        </Stack>
-                        {lvl.reward && (
-                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>{lvl.reward}</Typography>
-                        )}
-                        <LinearProgress
-                          variant="determinate"
-                          value={lvl.progress}
-                          sx={{ height: 8, borderRadius: 4, bgcolor: '#EDE9F7', '& .MuiLinearProgress-bar': { bgcolor: LAVENDER, borderRadius: 4 } }}
-                        />
-                        {lvl.next && (
-                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                            До следующего уровня: {lvl.next - xp} XP
-                          </Typography>
-                        )}
-                      </Box>
+                      {xp > 0 && (
+                        <Box sx={{ flex: 1 }}>
+                          <Stack direction="row" alignItems="center" spacing={1.5} mb={1}>
+                            <Chip label={`${lvl.level} — ${lvl.name}`} size="small" sx={{ bgcolor: LAVENDER_BG, color: LAVENDER, fontWeight: 700 }} />
+                            <Chip label={`${xp} XP`} size="small" sx={{ bgcolor: '#F7F5FC', color: '#9B83CF' }} />
+                          </Stack>
+                          {lvl.reward && (
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>{lvl.reward}</Typography>
+                          )}
+                          <LinearProgress
+                            variant="determinate"
+                            value={lvl.progress}
+                            sx={{ height: 8, borderRadius: 4, bgcolor: '#EDE9F7', '& .MuiLinearProgress-bar': { bgcolor: LAVENDER, borderRadius: 4 } }}
+                          />
+                          {lvl.next && (
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                              До следующего уровня: {lvl.next - xp} XP
+                            </Typography>
+                          )}
+                        </Box>
+                      )}
                       {badges.length > 0 && (
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                           {badges.map((b) => (
@@ -280,9 +282,10 @@ export default function TutorProfile() {
                           <Avatar
                             component={Link}
                             to={`/students/${r.studentProfileId}`}
+                            src={r.studentProfile.photoUrl || undefined}
                             sx={{ width: 36, height: 36, bgcolor: LAVENDER_BG, color: LAVENDER, fontSize: 12, fontWeight: 700, textDecoration: 'none', cursor: 'pointer', transition: 'opacity 0.2s', '&:hover': { opacity: 0.75 } }}
                           >
-                            {r.studentProfile.user.avatar || r.studentProfile.user.name.slice(0, 2)}
+                            {r.studentProfile.user.name.slice(0, 2).toUpperCase()}
                           </Avatar>
                           <Box sx={{ flex: 1 }}>
                             <Stack direction="row" alignItems="center" spacing={1}>

@@ -37,6 +37,19 @@ function ProtectedRoute({ children, role }: { children: React.ReactNode; role?: 
   return <>{children}</>;
 }
 
+// Tutor-only route that blocks PENDING tutors from all pages except setup/pending
+function TutorRoute({ children }: { children: React.ReactNode }) {
+  const { user } = useAuthStore();
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role !== 'TUTOR') {
+    if (user.role === 'STUDENT') return <Navigate to="/student/dashboard" replace />;
+    if (user.role === 'ADMIN') return <Navigate to="/admin" replace />;
+    return <Navigate to="/" replace />;
+  }
+  if (user.tutorStatus === 'PENDING') return <Navigate to="/tutor/pending" replace />;
+  return <>{children}</>;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -58,16 +71,16 @@ export default function App() {
           <Route path="/students/:id" element={<StudentPublicProfile />} />
 
           {/* Tutor routes */}
-          <Route path="/tutor/dashboard" element={<ProtectedRoute role="TUTOR"><TutorDashboard /></ProtectedRoute>} />
+          <Route path="/tutor/dashboard" element={<TutorRoute><TutorDashboard /></TutorRoute>} />
           <Route path="/dashboard/tutor" element={<Navigate to="/tutor/dashboard" replace />} />
           <Route path="/tutor/setup" element={<ProtectedRoute role="TUTOR"><TutorSetup /></ProtectedRoute>} />
           <Route path="/tutor/pending" element={<ProtectedRoute role="TUTOR"><PendingApproval /></ProtectedRoute>} />
-          <Route path="/tutor/sessions" element={<ProtectedRoute role="TUTOR"><SessionJournal /></ProtectedRoute>} />
-          <Route path="/tutor/criteria" element={<ProtectedRoute role="TUTOR"><ManageCriteria /></ProtectedRoute>} />
-          <Route path="/tutor/goals" element={<ProtectedRoute role="TUTOR"><ManageGoals /></ProtectedRoute>} />
-          <Route path="/tutor/students/:studentProfileId/progress" element={<ProtectedRoute role="TUTOR"><StudentProgress /></ProtectedRoute>} />
-          <Route path="/tutor/evaluate/:sessionId" element={<ProtectedRoute role="TUTOR"><EvaluateStudent /></ProtectedRoute>} />
-          <Route path="/tutor/reviews" element={<ProtectedRoute role="TUTOR"><TutorReviews /></ProtectedRoute>} />
+          <Route path="/tutor/sessions" element={<TutorRoute><SessionJournal /></TutorRoute>} />
+          <Route path="/tutor/criteria" element={<TutorRoute><ManageCriteria /></TutorRoute>} />
+          <Route path="/tutor/goals" element={<TutorRoute><ManageGoals /></TutorRoute>} />
+          <Route path="/tutor/students/:studentProfileId/progress" element={<TutorRoute><StudentProgress /></TutorRoute>} />
+          <Route path="/tutor/evaluate/:sessionId" element={<TutorRoute><EvaluateStudent /></TutorRoute>} />
+          <Route path="/tutor/reviews" element={<TutorRoute><TutorReviews /></TutorRoute>} />
 
           {/* Admin routes */}
           <Route path="/admin" element={<ProtectedRoute role="ADMIN"><AdminPanel /></ProtectedRoute>} />

@@ -84,8 +84,28 @@ sessionsRouter.post('/', async (req: AuthRequest, res: Response): Promise<void> 
 
 sessionsRouter.put('/:id/status', async (req: AuthRequest, res: Response): Promise<void> => {
   const { status, notes } = req.body;
+
+  // Validate status value
+  const VALID_STATUSES = ['SCHEDULED', 'COMPLETED', 'CANCELLED'];
+  if (!status || !VALID_STATUSES.includes(status)) {
+    res.status(400).json({ error: 'Invalid status' }); return;
+  }
+
   const session = await prisma.session.findUnique({ where: { id: req.params.id } });
   if (!session) { res.status(404).json({ error: 'Session not found' }); return; }
+
+  // Ownership + role-based status restrictions
+  if (req.user!.role === 'TUTOR') {
+    const tutor = await prisma.tutorProfile.findUnique({ where: { userId: req.user!.id } });
+    if (!tutor || tutor.id !== session.tutorProfileId) { res.status(403).json({ error: 'Forbidden' }); return; }
+  } else if (req.user!.role === 'STUDENT') {
+    const profile = await prisma.studentProfile.findUnique({ where: { userId: req.user!.id } });
+    if (!profile || profile.id !== session.studentProfileId) { res.status(403).json({ error: 'Forbidden' }); return; }
+    // Students can only cancel their own sessions
+    if (status !== 'CANCELLED') { res.status(403).json({ error: 'Students can only cancel sessions' }); return; }
+  } else {
+    res.status(403).json({ error: 'Forbidden' }); return;
+  }
 
   const updated = await prisma.session.update({
     where: { id: req.params.id },
@@ -93,37 +113,37 @@ sessionsRouter.put('/:id/status', async (req: AuthRequest, res: Response): Promi
   });
 
   if (status === 'COMPLETED') {
-    await checkAndAwardAchievements(session.studentProfileId, prisma);
+    try {
+      const [studentProfile, tutorProfile] = await Promise.all([
+        prisma.studentProfile.findUnique({ where: { id: session.studentProfileId }, select: { userId: true } }),
+        prisma.tutorProfile.findUnique({ where: { id: session.tutorProfileId }, select: { userId: true } }),
+      ]);
 
-    const studentProfile = await prisma.studentProfile.findUnique({
-      where: { id: session.studentProfileId },
-      select: { userId: true },
-    });
-    if (studentProfile) {
-      // Base XP for attending
-      let xpToAward = SESSION_XP;
+      await checkAndAwardAchievements(session.studentProfileId, prisma, studentProfile?.userId);
 
-      // Streak bonus: check if previous completed session was within 8 days
-      const prevSession = await prisma.session.findFirst({
-        where: { studentProfileId: session.studentProfileId, status: 'COMPLETED', id: { not: session.id } },
-        orderBy: { scheduledAt: 'desc' },
-        select: { scheduledAt: true },
-      });
-      if (prevSession) {
-        const daysDiff = (session.scheduledAt.getTime() - new Date(prevSession.scheduledAt).getTime()) / (1000 * 60 * 60 * 24);
-        if (daysDiff <= 8) xpToAward += STREAK_BONUS_XP;
+      const awardPromises: Promise<void>[] = [];
+
+      if (studentProfile) {
+        let xpToAward = SESSION_XP;
+        const prevSession = await prisma.session.findFirst({
+          where: { studentProfileId: session.studentProfileId, status: 'COMPLETED', id: { not: session.id } },
+          orderBy: { scheduledAt: 'desc' },
+          select: { scheduledAt: true },
+        });
+        if (prevSession) {
+          const daysDiff = (session.scheduledAt.getTime() - new Date(prevSession.scheduledAt).getTime()) / (1000 * 60 * 60 * 24);
+          if (daysDiff > 0 && daysDiff <= 8) xpToAward += STREAK_BONUS_XP;
+        }
+        awardPromises.push(awardXP(studentProfile.userId, xpToAward, prisma));
       }
 
-      await awardXP(studentProfile.userId, xpToAward, prisma);
-    }
+      if (tutorProfile) {
+        awardPromises.push(awardTutorXP(tutorProfile.userId, TUTOR_SESSION_XP, prisma));
+      }
 
-    // Award XP to tutor
-    const tutorProfile = await prisma.tutorProfile.findUnique({
-      where: { id: session.tutorProfileId },
-      select: { userId: true },
-    });
-    if (tutorProfile) {
-      await awardTutorXP(tutorProfile.userId, TUTOR_SESSION_XP, prisma);
+      await Promise.all(awardPromises);
+    } catch (err) {
+      console.error('Error awarding session completion rewards:', err);
     }
   }
 
@@ -140,5 +160,15 @@ sessionsRouter.get('/:id', async (req: AuthRequest, res: Response): Promise<void
     },
   });
   if (!session) { res.status(404).json({ error: 'Not found' }); return; }
+
+  // Only participants or admin can view session details
+  if (req.user!.role === 'STUDENT') {
+    const profile = await prisma.studentProfile.findUnique({ where: { userId: req.user!.id } });
+    if (!profile || profile.id !== session.studentProfileId) { res.status(403).json({ error: 'Forbidden' }); return; }
+  } else if (req.user!.role === 'TUTOR') {
+    const tutor = await prisma.tutorProfile.findUnique({ where: { userId: req.user!.id } });
+    if (!tutor || tutor.id !== session.tutorProfileId) { res.status(403).json({ error: 'Forbidden' }); return; }
+  }
+
   res.json(session);
 });

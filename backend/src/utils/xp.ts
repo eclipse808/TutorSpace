@@ -44,7 +44,7 @@ export async function awardTutorXP(userId: string, amount: number, prisma: Prism
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { xp: true } });
     if (!user) return;
     await prisma.user.update({ where: { id: userId }, data: { xp: user.xp + amount } });
-  } catch {
-    // Non-critical — don't fail the parent request
+  } catch (err) {
+    console.error(`Failed to award tutor XP to user ${userId}:`, err);
   }
 }

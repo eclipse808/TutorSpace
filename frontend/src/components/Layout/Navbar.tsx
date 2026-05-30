@@ -23,6 +23,7 @@ import InfoIcon from '@mui/icons-material/Info';
 import WarningIcon from '@mui/icons-material/Warning';
 import ErrorIcon from '@mui/icons-material/Error';
 import DoneAllIcon from '@mui/icons-material/DoneAll';
+import CloseIcon from '@mui/icons-material/Close';
 import { useAuthStore } from '../../store/authStore';
 import { Notification } from '../../types';
 import api from '../../api/client';
@@ -52,6 +53,7 @@ export default function Navbar() {
   const [notifAnchor, setNotifAnchor] = useState<HTMLElement | null>(null);
   const [notifLoading, setNotifLoading] = useState(false);
   const [markingAll, setMarkingAll] = useState(false);
+  const [profilePhoto, setProfilePhoto] = useState('');
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -62,6 +64,13 @@ export default function Navbar() {
       setNotifications(data);
     } catch {}
   }, [user]);
+
+  useEffect(() => {
+    if (!user) { setProfilePhoto(''); return; }
+    api.get('/auth/me').then((r) => {
+      setProfilePhoto(r.data.studentProfile?.photoUrl || r.data.tutorProfile?.photoUrl || '');
+    }).catch(() => {});
+  }, [user?.id]);
 
   useEffect(() => {
     fetchNotifications();
@@ -97,6 +106,14 @@ export default function Navbar() {
     if (n.link) navigate(n.link);
   };
 
+  const deleteNotification = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    try {
+      await api.delete(`/notifications/${id}`);
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+    } catch {}
+  };
+
   const handleLogout = () => { logout(); navigate('/'); setDrawerOpen(false); };
   const isActive = (path: string) => location.pathname === path || location.pathname.startsWith(path + '/');
 
@@ -106,7 +123,7 @@ export default function Navbar() {
     { to: '/student/goals', label: 'Мои цели', icon: <TrackChangesIcon fontSize="small" /> },
     { to: '/student/progress', label: 'Прогресс', icon: <BarChartIcon fontSize="small" /> },
   ];
-  const tutorLinks = [
+  const tutorLinks = user?.tutorStatus === 'PENDING' ? [] : [
     { to: '/tutor/sessions', label: 'Журнал', icon: <CalendarMonthIcon fontSize="small" /> },
     { to: '/tutor/goals', label: 'Цели учеников', icon: <TrackChangesIcon fontSize="small" /> },
     { to: '/tutor/criteria', label: 'Критерии', icon: <MenuBookIcon fontSize="small" /> },
@@ -127,7 +144,7 @@ export default function Navbar() {
     : user?.role === 'ADMIN' ? '/admin'
     : '/tutor/dashboard';
 
-  const userInitials = user ? user.avatar || user.name.slice(0, 2).toUpperCase() : '';
+  const userInitials = user ? user.name.slice(0, 2).toUpperCase() : '';
 
   return (
     <AppBar position="sticky" elevation={0}>
@@ -185,7 +202,7 @@ export default function Navbar() {
 
                 <Box component={Link} to={dashboardPath}
                   sx={{ display: 'flex', alignItems: 'center', gap: 1, textDecoration: 'none', px: 1, py: 0.5, borderRadius: 2, '&:hover': { bgcolor: LAVENDER_LIGHT, opacity: 0.9 } }}>
-                  <Avatar sx={{ width: 30, height: 30, bgcolor: LAVENDER, color: 'white', fontSize: 11, fontWeight: 700 }}>
+                  <Avatar src={profilePhoto || undefined} sx={{ width: 30, height: 30, bgcolor: LAVENDER, color: 'white', fontSize: 11, fontWeight: 700 }}>
                     {userInitials}
                   </Avatar>
                   <Typography variant="body2" sx={{ color: '#2D1B69', fontWeight: 600, fontSize: 13 }}>
@@ -285,7 +302,16 @@ export default function Navbar() {
                       <Typography variant="body2" fontWeight={n.read ? 500 : 700} color="text.primary" sx={{ lineHeight: 1.3 }}>
                         {n.title}
                       </Typography>
-                      {!n.read && <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: LAVENDER, flexShrink: 0, mt: 0.5 }} />}
+                      <Stack direction="row" alignItems="center" spacing={0.5} flexShrink={0}>
+                        {!n.read && <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: LAVENDER, mt: 0.5 }} />}
+                        <IconButton
+                          size="small"
+                          onClick={(e) => deleteNotification(e, n.id)}
+                          sx={{ width: 20, height: 20, color: '#C4B5D8', '&:hover': { color: '#dc2626', bgcolor: '#FEF2F2' } }}
+                        >
+                          <CloseIcon sx={{ fontSize: 13 }} />
+                        </IconButton>
+                      </Stack>
                     </Stack>
                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25, lineHeight: 1.4 }}>
                       {n.message}
@@ -307,7 +333,7 @@ export default function Navbar() {
         <Box sx={{ p: 2 }}>
           {user && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2, background: 'linear-gradient(135deg, #7C5CBF, #9B83CF)', borderRadius: 3, mb: 2 }}>
-              <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.25)', color: 'white', fontWeight: 700, width: 40, height: 40 }}>
+              <Avatar src={profilePhoto || undefined} sx={{ bgcolor: 'rgba(255,255,255,0.25)', color: 'white', fontWeight: 700, width: 40, height: 40 }}>
                 {userInitials}
               </Avatar>
               <Box sx={{ flex: 1, minWidth: 0 }}>

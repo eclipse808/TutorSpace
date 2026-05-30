@@ -83,8 +83,8 @@ export default function SessionJournal() {
               <Card key={session.id} elevation={1}>
                 <CardContent sx={{ p: 2.5 }}>
                   <Stack direction="row" spacing={2} alignItems="flex-start">
-                    <Avatar sx={{ width: 48, height: 48, bgcolor: LAVENDER_BG, color: LAVENDER, fontWeight: 700, flexShrink: 0 }}>
-                      {session.studentProfile?.user.avatar || session.studentProfile?.user.name?.[0]}
+                    <Avatar src={session.studentProfile?.photoUrl || undefined} sx={{ width: 48, height: 48, bgcolor: LAVENDER_BG, color: LAVENDER, fontWeight: 700, flexShrink: 0 }}>
+                      {session.studentProfile?.user.name?.slice(0, 2).toUpperCase() || '?'}
                     </Avatar>
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                       <Stack direction="row" justifyContent="space-between" alignItems="flex-start" flexWrap="wrap" gap={1}>

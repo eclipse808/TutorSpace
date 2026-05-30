@@ -5,6 +5,7 @@ import {
 import { format, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Box, Typography } from '@mui/material';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import { CompetencyCriteria } from '../../types';
 
 interface Props {
@@ -36,7 +37,7 @@ export default function HistoryLineChart({ criteria, history }: Props) {
     return (
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 260, color: 'text.secondary', textAlign: 'center' }}>
         <Box>
-          <Typography sx={{ fontSize: '2rem', mb: 1 }}>📈</Typography>
+          <TrendingUpIcon sx={{ fontSize: 44, mb: 1, color: '#D5C9EE' }} />
           <Typography variant="body2">История оценок пока пуста</Typography>
         </Box>
       </Box>

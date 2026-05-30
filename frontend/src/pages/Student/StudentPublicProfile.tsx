@@ -23,6 +23,7 @@ const LAVENDER_BG = '#F0EBF8';
 interface PublicProfile {
   id: string;
   user: { id: string; name: string; avatar?: string; xp: number; level: number };
+  photoUrl?: string;
   completedSessions: number;
   achievements: (Achievement & { earnedAt: string })[];
 }
@@ -60,7 +61,7 @@ export default function StudentPublicProfile() {
     );
   }
 
-  const { user, completedSessions, achievements } = profile;
+  const { user, completedSessions, achievements, photoUrl } = profile;
   const li = getLevelProgress(user.xp, user.level);
 
   return (
@@ -73,7 +74,7 @@ export default function StudentPublicProfile() {
       <Card elevation={0} sx={{ background: 'linear-gradient(135deg, #7C5CBF, #6A4DAD)', color: 'white', mb: 3, border: 'none' }}>
         <CardContent sx={{ p: 3 }}>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={3} alignItems={{ sm: 'center' }}>
-            <Avatar sx={{ width: 80, height: 80, bgcolor: 'rgba(255,255,255,0.25)', fontSize: 22, fontWeight: 700, flexShrink: 0 }}>
+            <Avatar src={photoUrl || undefined} sx={{ width: 80, height: 80, bgcolor: 'rgba(255,255,255,0.25)', fontSize: 22, fontWeight: 700, flexShrink: 0 }}>
               {user.avatar || user.name.slice(0, 2).toUpperCase()}
             </Avatar>
             <Box sx={{ flex: 1 }}>

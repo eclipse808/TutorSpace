@@ -255,7 +255,7 @@ export default function TutorDashboard() {
             </Box>
             <Box sx={{ flex: 1 }}>
               <Typography variant="h5" fontWeight={700} sx={{ color: 'white' }}>
-                {user?.name} 🎓
+                {user?.name}
               </Typography>
               <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.75)', mt: 0.5 }}>
                 Репетитор · {tutorProfile?.reviewCount || 0} отзывов
@@ -383,8 +383,8 @@ export default function TutorDashboard() {
                 <Stack spacing={1.5}>
                   {sessions.slice(0, 4).map((s) => (
                     <Box key={s.id} sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 1.5, bgcolor: '#F7F5FC', borderRadius: 2 }}>
-                      <Avatar sx={{ width: 36, height: 36, bgcolor: LAVENDER_BG, color: LAVENDER, fontSize: 11, fontWeight: 700 }}>
-                        {s.studentProfile?.user.avatar}
+                      <Avatar src={s.studentProfile?.photoUrl || undefined} sx={{ width: 36, height: 36, bgcolor: LAVENDER_BG, color: LAVENDER, fontSize: 11, fontWeight: 700 }}>
+                        {s.studentProfile?.user.name?.slice(0, 2).toUpperCase() || '?'}
                       </Avatar>
                       <Box sx={{ flex: 1, minWidth: 0 }}>
                         <Typography variant="body2" fontWeight={600} noWrap>{s.studentProfile?.user.name}</Typography>
@@ -438,8 +438,8 @@ export default function TutorDashboard() {
                   <Stack spacing={0.75}>
                     {students.slice(0, 3).map((st) => (
                       <Box key={st.id} component={Link} to={`/tutor/students/${st.id}/progress`} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 1.5, py: 1, borderRadius: 1.5, textDecoration: 'none', '&:hover': { bgcolor: '#F7F5FC' }, transition: 'all 0.15s' }}>
-                        <Avatar sx={{ width: 32, height: 32, bgcolor: LAVENDER_BG, color: LAVENDER, fontSize: 11, fontWeight: 700 }}>
-                          {st.user.avatar}
+                        <Avatar src={st.photoUrl || undefined} sx={{ width: 32, height: 32, bgcolor: LAVENDER_BG, color: LAVENDER, fontSize: 11, fontWeight: 700 }}>
+                          {st.user.name?.slice(0, 2).toUpperCase() || '?'}
                         </Avatar>
                         <Typography variant="body2" color="text.primary">{st.user.name}</Typography>
                         <ArrowForwardIcon sx={{ fontSize: 14, color: '#C0B4E4', ml: 'auto' }} />

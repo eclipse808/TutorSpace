@@ -81,7 +81,9 @@ goalsRouter.put('/:id/request-complete', async (req: AuthRequest, res: Response)
 // PUT /goals/:id/complete — tutor confirms completion and awards XP
 goalsRouter.put('/:id/complete', async (req: AuthRequest, res: Response): Promise<void> => {
   if (req.user!.role !== 'TUTOR') { res.status(403).json({ error: 'Tutor only' }); return; }
-  const goal = await prisma.goal.findUnique({ where: { id: req.params.id } });
+  const tutor = await prisma.tutorProfile.findUnique({ where: { userId: req.user!.id } });
+  if (!tutor) { res.status(404).json({ error: 'Not found' }); return; }
+  const goal = await prisma.goal.findFirst({ where: { id: req.params.id, tutorProfileId: tutor.id } });
   if (!goal) { res.status(404).json({ error: 'Not found' }); return; }
   if (goal.completed) { res.status(400).json({ error: 'Already completed' }); return; }
 
@@ -102,7 +104,9 @@ goalsRouter.put('/:id/complete', async (req: AuthRequest, res: Response): Promis
 // PUT /goals/:id/reject-complete — tutor rejects student's completion request
 goalsRouter.put('/:id/reject-complete', async (req: AuthRequest, res: Response): Promise<void> => {
   if (req.user!.role !== 'TUTOR') { res.status(403).json({ error: 'Tutor only' }); return; }
-  const goal = await prisma.goal.findUnique({ where: { id: req.params.id } });
+  const tutor = await prisma.tutorProfile.findUnique({ where: { userId: req.user!.id } });
+  if (!tutor) { res.status(404).json({ error: 'Not found' }); return; }
+  const goal = await prisma.goal.findFirst({ where: { id: req.params.id, tutorProfileId: tutor.id } });
   if (!goal) { res.status(404).json({ error: 'Not found' }); return; }
 
   const updated = await prisma.goal.update({
@@ -115,6 +119,10 @@ goalsRouter.put('/:id/reject-complete', async (req: AuthRequest, res: Response):
 // DELETE /goals/:id — tutor deletes a goal
 goalsRouter.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
   if (req.user!.role !== 'TUTOR') { res.status(403).json({ error: 'Tutor only' }); return; }
+  const tutor = await prisma.tutorProfile.findUnique({ where: { userId: req.user!.id } });
+  if (!tutor) { res.status(404).json({ error: 'Not found' }); return; }
+  const goal = await prisma.goal.findFirst({ where: { id: req.params.id, tutorProfileId: tutor.id } });
+  if (!goal) { res.status(404).json({ error: 'Not found' }); return; }
   await prisma.goal.delete({ where: { id: req.params.id } });
   res.json({ success: true });
 });

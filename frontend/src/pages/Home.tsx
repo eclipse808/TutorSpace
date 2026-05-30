@@ -11,20 +11,32 @@ import MenuBookIcon from '@mui/icons-material/MenuBook';
 import StarIcon from '@mui/icons-material/Star';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import CalculateIcon from '@mui/icons-material/Calculate';
+import LanguageIcon from '@mui/icons-material/Language';
+import BoltIcon from '@mui/icons-material/Bolt';
+import CodeIcon from '@mui/icons-material/Code';
+import ScienceIcon from '@mui/icons-material/Science';
+import HistoryEduIcon from '@mui/icons-material/HistoryEdu';
+import SpellcheckIcon from '@mui/icons-material/Spellcheck';
+import LocalFloristIcon from '@mui/icons-material/LocalFlorist';
+import PersonIcon from '@mui/icons-material/Person';
+import TrackChangesIcon from '@mui/icons-material/TrackChanges';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import { SvgIconComponent } from '@mui/icons-material';
 import { TutorProfile } from '../types';
 import TutorCard from '../components/Tutors/TutorCard';
 import api from '../api/client';
 
 const LAVENDER = '#7C5CBF';
-const DIRECTIONS = [
-  { subject: 'Математика', icon: '📐', desc: 'Алгебра, геометрия, ЕГЭ', bg: '#EFF6FF', border: '#BFDBFE' },
-  { subject: 'Английский язык', icon: '🇬🇧', desc: 'Разговорный, IELTS', bg: '#F5F3FF', border: '#DDD6FE' },
-  { subject: 'Физика', icon: '⚡', desc: 'Механика, ЕГЭ', bg: '#FEFCE8', border: '#FEF08A' },
-  { subject: 'Информатика', icon: '💻', desc: 'Программирование', bg: '#F0FDF4', border: '#BBF7D0' },
-  { subject: 'Химия', icon: '🧪', desc: 'Органика, олимпиады', bg: '#FFF1F2', border: '#FECDD3' },
-  { subject: 'История', icon: '📜', desc: 'ЕГЭ, олимпиады', bg: '#FFF7ED', border: '#FED7AA' },
-  { subject: 'Русский язык', icon: '📝', desc: 'ЕГЭ, сочинения', bg: '#F5F3FF', border: '#DDD6FE' },
-  { subject: 'Биология', icon: '🌿', desc: 'Генетика, ОГЭ/ЕГЭ', bg: '#ECFDF5', border: '#A7F3D0' },
+const DIRECTIONS: { subject: string; Icon: SvgIconComponent; iconColor: string; desc: string; bg: string; border: string }[] = [
+  { subject: 'Математика', Icon: CalculateIcon, iconColor: '#3b82f6', desc: 'Алгебра, геометрия, ЕГЭ', bg: '#EFF6FF', border: '#BFDBFE' },
+  { subject: 'Английский язык', Icon: LanguageIcon, iconColor: '#7C5CBF', desc: 'Разговорный, IELTS', bg: '#F5F3FF', border: '#DDD6FE' },
+  { subject: 'Физика', Icon: BoltIcon, iconColor: '#ca8a04', desc: 'Механика, ЕГЭ', bg: '#FEFCE8', border: '#FEF08A' },
+  { subject: 'Информатика', Icon: CodeIcon, iconColor: '#16a34a', desc: 'Программирование', bg: '#F0FDF4', border: '#BBF7D0' },
+  { subject: 'Химия', Icon: ScienceIcon, iconColor: '#e11d48', desc: 'Органика, олимпиады', bg: '#FFF1F2', border: '#FECDD3' },
+  { subject: 'История', Icon: HistoryEduIcon, iconColor: '#ea580c', desc: 'ЕГЭ, олимпиады', bg: '#FFF7ED', border: '#FED7AA' },
+  { subject: 'Русский язык', Icon: SpellcheckIcon, iconColor: '#7C5CBF', desc: 'ЕГЭ, сочинения', bg: '#F5F3FF', border: '#DDD6FE' },
+  { subject: 'Биология', Icon: LocalFloristIcon, iconColor: '#059669', desc: 'Генетика, ОГЭ/ЕГЭ', bg: '#ECFDF5', border: '#A7F3D0' },
 ];
 
 type Suggestion = { type: 'subject'; label: string } | { type: 'tutor'; label: string; id: string };
@@ -122,7 +134,7 @@ export default function Home() {
                 {suggestions.map((s, i) => (
                   <Box key={i} onClick={() => handleSuggestion(s)}
                     sx={{ display: 'flex', alignItems: 'center', gap: 2, px: 2, py: 1.5, cursor: 'pointer', '&:hover': { bgcolor: '#F7F5FC' }, borderBottom: i < suggestions.length - 1 ? '1px solid #F0EBF8' : 'none' }}>
-                    <Typography sx={{ fontSize: '1.1rem' }}>{s.type === 'subject' ? '📚' : '👤'}</Typography>
+                    {s.type === 'subject' ? <MenuBookIcon sx={{ fontSize: 20, color: LAVENDER }} /> : <PersonIcon sx={{ fontSize: 20, color: '#9B83CF' }} />}
                     <Box>
                       <Typography variant="body2" fontWeight={500}>{s.label}</Typography>
                       <Typography variant="caption" color="text.secondary">{s.type === 'subject' ? 'Предмет' : 'Репетитор'}</Typography>
@@ -172,7 +184,7 @@ export default function Home() {
                   sx={{ cursor: 'pointer', bgcolor: d.bg, border: `1px solid ${d.border}`, boxShadow: 'none', transition: 'all 0.2s', '&:hover': { boxShadow: '0 4px 12px rgba(0,0,0,0.1)', transform: 'translateY(-2px)' } }}
                 >
                   <CardContent sx={{ p: 2 }}>
-                    <Typography sx={{ fontSize: '2rem', mb: 1 }}>{d.icon}</Typography>
+                    <Box sx={{ mb: 1 }}><d.Icon sx={{ fontSize: 32, color: d.iconColor }} /></Box>
                     <Typography variant="body2" fontWeight={600} color="text.primary" sx={{ lineHeight: 1.3 }}>{d.subject}</Typography>
                     <Typography variant="caption" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' }, mt: 0.5 }}>{d.desc}</Typography>
                   </CardContent>
@@ -188,14 +200,16 @@ export default function Home() {
           <Typography variant="body1" color="text.secondary" textAlign="center" mb={5}>Не просто поиск репетитора — полная экосистема обучения</Typography>
           <Grid container spacing={3}>
             {[
-              { icon: '🎯', title: 'Умный подбор', desc: 'Фильтрация по предметам, рейтингу и цене. Детальные профили с образованием и опытом.' },
-              { icon: '📊', title: 'Радар прогресса', desc: 'Уникальная визуализация компетенций в виде радарной диаграммы. Видите, как растёт каждый навык.' },
-              { icon: '🏆', title: 'Уровни и XP', desc: 'Геймификация обучения: зарабатывай опыт за занятия и выполнение заданий, повышай уровень.' },
+              { Icon: TrackChangesIcon, color: LAVENDER, title: 'Умный подбор', desc: 'Фильтрация по предметам, рейтингу и цене. Детальные профили с образованием и опытом.' },
+              { Icon: BarChartIcon, color: '#6A4DAD', title: 'Радар прогресса', desc: 'Уникальная визуализация компетенций в виде радарной диаграммы. Видите, как растёт каждый навык.' },
+              { Icon: EmojiEventsIcon, color: '#d97706', title: 'Уровни и XP', desc: 'Геймификация обучения: зарабатывай опыт за занятия и выполнение заданий, повышай уровень.' },
             ].map((f) => (
               <Grid item xs={12} sm={4} key={f.title}>
                 <Card elevation={1} sx={{ textAlign: 'center', p: 1, height: '100%', transition: 'all 0.3s', '&:hover': { boxShadow: '0 4px 16px rgba(124,92,191,0.15)' } }}>
                   <CardContent>
-                    <Typography sx={{ fontSize: '2.5rem', mb: 2 }}>{f.icon}</Typography>
+                    <Box sx={{ width: 56, height: 56, bgcolor: '#F0EBF8', borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 2 }}>
+                      <f.Icon sx={{ fontSize: 28, color: f.color }} />
+                    </Box>
                     <Typography variant="h6" fontWeight={700} mb={1}>{f.title}</Typography>
                     <Typography variant="body2" color="text.secondary">{f.desc}</Typography>
                   </CardContent>

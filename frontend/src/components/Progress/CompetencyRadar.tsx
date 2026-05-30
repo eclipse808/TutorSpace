@@ -3,6 +3,7 @@ import {
   ResponsiveContainer, Tooltip, Legend
 } from 'recharts';
 import { Box, Typography } from '@mui/material';
+import BarChartIcon from '@mui/icons-material/BarChart';
 import { CompetencyCriteria } from '../../types';
 
 interface Props {
@@ -35,7 +36,7 @@ export default function CompetencyRadar({ criteria, currentScores, previousScore
     return (
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 320, color: 'text.secondary', textAlign: 'center' }}>
         <Box>
-          <Typography sx={{ fontSize: '2.5rem', mb: 1 }}>📊</Typography>
+          <BarChartIcon sx={{ fontSize: 52, mb: 1, color: '#D5C9EE' }} />
           <Typography variant="body1" fontWeight={500}>Нет данных для отображения</Typography>
           <Typography variant="body2" color="text.secondary">Репетитор ещё не выставил оценки</Typography>
         </Box>

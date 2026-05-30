@@ -49,7 +49,14 @@ export default function MyGoals() {
   const pending = goals.filter((g) => !g.completed && g.pendingConfirmation);
   const completed = goals.filter((g) => g.completed);
 
-  const filtered = tab === 1 ? active : tab === 2 ? pending : tab === 3 ? completed : goals;
+  // Tab indices: 0=all, 1=active, 2=pending(if any), 2or3=completed
+  const tabItems = [
+    { data: goals },
+    { data: active },
+    ...(pending.length > 0 ? [{ data: pending }] : []),
+    { data: completed },
+  ];
+  const filtered = tabItems[tab]?.data ?? goals;
   const totalXpEarned = completed.reduce((s, g) => s + g.xpReward, 0);
   const totalXpPossible = [...active, ...pending].reduce((s, g) => s + g.xpReward, 0);
 

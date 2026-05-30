@@ -107,9 +107,7 @@ tutorsRouter.get('/me/students', authenticate, async (req: AuthRequest, res: Res
     distinct: ['studentProfileId'],
   });
 
-  const students = sessions.map((s) => s.studentProfile);
-  const unique = [...new Map(students.map((s) => [s.id, s])).values()];
-  res.json(unique);
+  res.json(sessions.map((s) => s.studentProfile));
 });
 
 // PUT /tutors/me/hourly-rate — instant price update (no admin review)
@@ -202,7 +200,8 @@ tutorsRouter.get('/:id/slots', async (req, res) => {
     const startHour = new Date(s.scheduledAt).getHours();
     const hoursNeeded = Math.ceil(s.duration / 60);
     for (let i = 0; i < hoursNeeded; i++) {
-      busyHours.add(startHour + i);
+      const h = startHour + i;
+      if (h <= 23) busyHours.add(h);
     }
   });
 

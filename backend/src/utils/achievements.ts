@@ -1,6 +1,10 @@
 import { PrismaClient } from '@prisma/client';
 
-export async function checkAndAwardAchievements(studentProfileId: string, prisma: PrismaClient): Promise<string[]> {
+export async function checkAndAwardAchievements(
+  studentProfileId: string,
+  prisma: PrismaClient,
+  notifyUserId?: string,
+): Promise<string[]> {
   const allAchievements = await prisma.achievement.findMany();
   const earned = await prisma.studentAchievement.findMany({
     where: { studentProfileId },
@@ -25,6 +29,12 @@ export async function checkAndAwardAchievements(studentProfileId: string, prisma
     distinct: ['subject'],
   });
 
+  // Count sessions completed in the last 7 days for STREAK check
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const weekSessions = await prisma.session.count({
+    where: { studentProfileId, status: 'COMPLETED', scheduledAt: { gte: weekAgo } },
+  });
+
   const newIds: string[] = [];
 
   for (const ach of allAchievements) {
@@ -35,6 +45,8 @@ export async function checkAndAwardAchievements(studentProfileId: string, prisma
       earned = completedCount >= ach.sessionsRequired;
     } else if (ach.type === 'SCORE_MILESTONE' && ach.threshold != null) {
       earned = maxScore >= ach.threshold;
+    } else if (ach.type === 'STREAK') {
+      earned = weekSessions >= 3;
     } else if (ach.type === 'SPECIAL' && ach.name === 'Полиглот') {
       earned = subjects.length >= 2;
     }
@@ -47,6 +59,21 @@ export async function checkAndAwardAchievements(studentProfileId: string, prisma
       data: newIds.map((achievementId) => ({ studentProfileId, achievementId })),
       skipDuplicates: true,
     });
+
+    // Notify the student about new achievements
+    if (notifyUserId) {
+      const newAchievements = allAchievements.filter((a) => newIds.includes(a.id));
+      const names = newAchievements.map((a) => `${a.icon} ${a.name}`).join(', ');
+      await prisma.notification.create({
+        data: {
+          userId: notifyUserId,
+          type: 'SUCCESS',
+          title: newIds.length === 1 ? 'Новое достижение!' : `Новые достижения (${newIds.length})!`,
+          message: names,
+          link: '/student/achievements',
+        },
+      });
+    }
   }
 
   return newIds;

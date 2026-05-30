@@ -1,14 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Box, Typography, Card, CardContent, Button, Grid,
-  Stack, Chip, ToggleButtonGroup, ToggleButton, CircularProgress,
+  Stack, Chip, ToggleButtonGroup, ToggleButton, CircularProgress, Tooltip,
 } from '@mui/material';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import TimelineIcon from '@mui/icons-material/Timeline';
 import ViewColumnIcon from '@mui/icons-material/ViewColumn';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import PersonIcon from '@mui/icons-material/Person';
+import ForumIcon from '@mui/icons-material/Forum';
 import { RadarData, HistoryData, Achievement, CompetencyCriteria } from '../../types';
 import CompetencyRadar from '../../components/Progress/CompetencyRadar';
 import HistoryLineChart from '../../components/Progress/HistoryLineChart';
@@ -23,6 +25,7 @@ type ChartType = 'radar' | 'line' | 'bar';
 interface SubjectData {
   criteria: CompetencyCriteria[];
   currentScores: Record<string, number>;
+  currentNotes: Record<string, string>;
 }
 
 const LAVENDER = '#7C5CBF';
@@ -31,7 +34,9 @@ const LAVENDER_BG = '#F0EBF8';
 export default function MyProgress() {
   const [subjects, setSubjects] = useState<string[]>([]);
   const [subjectData, setSubjectData] = useState<Record<string, SubjectData>>({});
+  const [tutorNames, setTutorNames] = useState<Record<string, string>>({});
   const [selectedSubject, setSelectedSubject] = useState<string>('');
+  const [selectedTutorId, setSelectedTutorId] = useState<string>('');
   const [period, setPeriod] = useState<Period>('all');
   const [chartType, setChartType] = useState<ChartType>('radar');
   const [radarData, setRadarData] = useState<RadarData | null>(null);
@@ -54,40 +59,54 @@ export default function MyProgress() {
         setEarned(r.data.earned || []);
         setLocked(r.data.locked || []);
       }),
+      api.get('/progress/my-tutors').then((r) => {
+        const map: Record<string, string> = {};
+        for (const t of r.data) {
+          if (t.id && t.user?.name) map[t.id] = t.user.name;
+        }
+        setTutorNames(map);
+      }),
     ]).finally(() => setLoading(false));
   }, []);
 
-  // Reload radar + history when subject or period changes
+  // Unique tutor IDs for the selected subject
+  const tutorsForSubject = useMemo(() => {
+    const criteria = subjectData[selectedSubject]?.criteria || [];
+    return [...new Set(criteria.map((c) => c.tutorProfileId))];
+  }, [selectedSubject, subjectData]);
+
+  // Reset tutor selection when subject changes
   useEffect(() => {
-    if (!selectedSubject) return;
+    if (tutorsForSubject.length > 0) setSelectedTutorId(tutorsForSubject[0]);
+  }, [selectedSubject]);
+
+  // Reload radar + history when tutor or period changes
+  useEffect(() => {
+    if (!selectedSubject || !selectedTutorId) return;
     setChartLoading(true);
 
-    // Get tutorProfileId from first criterion of this subject
-    const subjCriteria = subjectData[selectedSubject]?.criteria;
-    const tutorProfileId = subjCriteria?.[0]?.tutorProfileId;
-    if (!tutorProfileId) {
-      setChartLoading(false);
-      return;
-    }
-
     Promise.all([
-      api.get(`/progress/radar?tutorProfileId=${tutorProfileId}&period=${period}`).then((r) => {
-        // Filter radar data to only show criteria of selected subject
-        const rd: RadarData = r.data;
-        const subjectCriteria = rd.criteria.filter((c) => c.subject === selectedSubject);
-        setRadarData({ ...rd, criteria: subjectCriteria });
+      api.get(`/progress/radar?tutorProfileId=${selectedTutorId}&subject=${encodeURIComponent(selectedSubject)}&period=${period}`).then((r) => {
+        setRadarData(r.data);
       }),
-      api.get(`/progress/history?subject=${encodeURIComponent(selectedSubject)}`).then((r) => {
+      api.get(`/progress/history?subject=${encodeURIComponent(selectedSubject)}&tutorProfileId=${selectedTutorId}`).then((r) => {
         setHistoryData(r.data);
       }),
-    ]).finally(() => setChartLoading(false));
-  }, [selectedSubject, period, subjectData]);
+    ]).catch(() => {
+      setRadarData(null);
+      setHistoryData(null);
+    }).finally(() => setChartLoading(false));
+  }, [selectedSubject, selectedTutorId, period]);
 
   if (loading) return <PageLoader />;
 
+  // Filter criteria to selected tutor
   const currentSubjectData = subjectData[selectedSubject];
-  const subjectCriteria = currentSubjectData?.criteria || [];
+  const subjectCriteria = (currentSubjectData?.criteria || []).filter(
+    (c) => c.tutorProfileId === selectedTutorId,
+  );
   const subjectScores = currentSubjectData?.currentScores || {};
+  const subjectNotes = currentSubjectData?.currentNotes || {};
 
   const avgScore = subjectCriteria.length
     ? (subjectCriteria.reduce((s, c) => s + (subjectScores[c.id] ?? 0), 0) / subjectCriteria.length).toFixed(1)
@@ -98,6 +117,7 @@ export default function MyProgress() {
     : null;
 
   const hasData = subjects.length > 0;
+  const hasChartData = subjectCriteria.length > 0 && Object.keys(subjectScores).some((id) => subjectCriteria.some((c) => c.id === id));
 
   return (
     <Box>
@@ -134,6 +154,31 @@ export default function MyProgress() {
               </Box>
             </CardContent>
           </Card>
+
+          {/* Tutor selector — only when multiple tutors for this subject */}
+          {tutorsForSubject.length > 1 && (
+            <Card elevation={1} sx={{ border: '1px solid #EDE9F7' }}>
+              <CardContent sx={{ pb: '16px !important' }}>
+                <Stack direction="row" alignItems="center" spacing={1} mb={1}>
+                  <PersonIcon sx={{ color: LAVENDER, fontSize: 18 }} />
+                  <Typography variant="overline" color="text.secondary" fontWeight={700} sx={{ letterSpacing: 1 }}>
+                    Репетитор
+                  </Typography>
+                </Stack>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                  {tutorsForSubject.map((tid) => (
+                    <Chip
+                      key={tid}
+                      label={tutorNames[tid] || 'Репетитор'}
+                      onClick={() => setSelectedTutorId(tid)}
+                      color={selectedTutorId === tid ? 'primary' : 'default'}
+                      sx={{ fontWeight: selectedTutorId === tid ? 700 : 500, cursor: 'pointer' }}
+                    />
+                  ))}
+                </Box>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Quick stats for selected subject */}
           {subjectCriteria.length > 0 && (
@@ -175,6 +220,11 @@ export default function MyProgress() {
               <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} gap={2} mb={3}>
                 <Typography variant="subtitle1" fontWeight={700}>
                   {selectedSubject} — прогресс
+                  {tutorsForSubject.length > 1 && selectedTutorId && (
+                    <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1 }}>
+                      ({tutorNames[selectedTutorId] || 'Репетитор'})
+                    </Typography>
+                  )}
                 </Typography>
                 <Stack direction="row" spacing={1} flexWrap="wrap">
                   <ToggleButtonGroup
@@ -206,6 +256,12 @@ export default function MyProgress() {
                 <Box sx={{ height: 320, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <CircularProgress size={32} color="primary" />
                 </Box>
+              ) : !hasChartData ? (
+                <Box sx={{ height: 200, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'text.secondary' }}>
+                  <MenuBookIcon sx={{ fontSize: 40, opacity: 0.3, mb: 1 }} />
+                  <Typography variant="body2">Навыки ещё не оценивались</Typography>
+                  <Typography variant="caption">Репетитор оценит компетенции после занятия</Typography>
+                </Box>
               ) : (
                 <>
                   {chartType === 'radar' && (
@@ -225,23 +281,80 @@ export default function MyProgress() {
                 </>
               )}
 
-              {/* Criteria legend */}
+              {/* Criteria legend with descriptions and tutor notes */}
               {subjectCriteria.length > 0 && (
                 <Grid container spacing={1} sx={{ mt: 2, pt: 2, borderTop: '1px solid #F7F5FC' }}>
-                  {subjectCriteria.map((c) => (
-                    <Grid item xs={6} sm={4} key={c.id}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: LAVENDER_BG, borderRadius: 1.5, px: 1.5, py: 0.75 }}>
-                        <Typography variant="caption" fontWeight={500} noWrap sx={{ flex: 1, mr: 1 }}>{c.name}</Typography>
-                        <Typography variant="caption" fontWeight={700} color="primary">
-                          {subjectScores[c.id] ?? 0}/10
-                        </Typography>
-                      </Box>
-                    </Grid>
-                  ))}
+                  {subjectCriteria.map((c) => {
+                    const note = subjectNotes[c.id];
+                    const score = subjectScores[c.id] ?? 0;
+                    const scoreColor = score >= 8 ? '#16a34a' : score >= 5 ? LAVENDER : score >= 3 ? '#d97706' : '#dc2626';
+                    return (
+                      <Grid item xs={12} sm={6} md={4} key={c.id}>
+                        <Tooltip title={c.description || ''} placement="top" arrow disableHoverListener={!c.description}>
+                          <Box
+                            sx={{
+                              bgcolor: LAVENDER_BG, borderRadius: 1.5, px: 1.5, py: 1,
+                              cursor: c.description ? 'help' : 'default',
+                              border: note ? '1px solid #D5C9EE' : '1px solid transparent',
+                            }}
+                          >
+                            <Stack direction="row" justifyContent="space-between" alignItems="center">
+                              <Typography variant="caption" fontWeight={600} noWrap sx={{ flex: 1, mr: 1 }}>{c.name}</Typography>
+                              <Typography variant="caption" fontWeight={700} sx={{ color: scoreColor, flexShrink: 0 }}>
+                                {score}/10
+                              </Typography>
+                            </Stack>
+                            {note && (
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                                sx={{ display: 'block', mt: 0.5, fontStyle: 'italic', lineHeight: 1.4 }}
+                              >
+                                «{note}»
+                              </Typography>
+                            )}
+                          </Box>
+                        </Tooltip>
+                      </Grid>
+                    );
+                  })}
                 </Grid>
               )}
             </CardContent>
           </Card>
+
+          {/* Tutor feedback / notes */}
+          {(() => {
+            const notesEntries = subjectCriteria
+              .filter((c) => subjectNotes[c.id])
+              .map((c) => ({ name: c.name, note: subjectNotes[c.id] }));
+            if (notesEntries.length === 0) return null;
+            return (
+              <Card elevation={1} sx={{ border: '1px solid #D5C9EE' }}>
+                <CardContent sx={{ p: 2.5 }}>
+                  <Stack direction="row" alignItems="center" spacing={1} mb={2}>
+                    <ForumIcon sx={{ color: LAVENDER, fontSize: 20 }} />
+                    <Typography variant="subtitle1" fontWeight={700}>Комментарии репетитора</Typography>
+                    {tutorsForSubject.length > 1 && selectedTutorId && (
+                      <Chip label={tutorNames[selectedTutorId] || 'Репетитор'} size="small" sx={{ bgcolor: LAVENDER_BG, color: LAVENDER, fontWeight: 600 }} />
+                    )}
+                  </Stack>
+                  <Stack spacing={1.5}>
+                    {notesEntries.map(({ name, note }) => (
+                      <Box key={name} sx={{ p: 1.5, bgcolor: '#F7F5FC', borderRadius: 2, borderLeft: '3px solid #B39DDB' }}>
+                        <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.3 }}>
+                          {name}
+                        </Typography>
+                        <Typography variant="body2" sx={{ mt: 0.5, fontStyle: 'italic', color: 'text.primary', lineHeight: 1.6 }}>
+                          «{note}»
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Stack>
+                </CardContent>
+              </Card>
+            );
+          })()}
 
           {/* Achievements */}
           <Box>

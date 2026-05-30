@@ -6,6 +6,7 @@ import {
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SaveIcon from '@mui/icons-material/Save';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import TrophyIcon from '@mui/icons-material/EmojiEvents';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
@@ -98,7 +99,7 @@ export default function EvaluateStudent() {
   if (success) {
     return (
       <Box sx={{ maxWidth: 600, mx: 'auto', textAlign: 'center', py: 8 }}>
-        <Typography sx={{ fontSize: '4rem', mb: 2 }}>✅</Typography>
+        <CheckCircleIcon sx={{ fontSize: 80, color: '#22c55e', mb: 2 }} />
         <Typography variant="h4" fontWeight={700} mb={1}>Оценки сохранены!</Typography>
         <Typography color="text.secondary" mb={4}>Ученик увидит прогресс в своём кабинете</Typography>
         {newAchievements.length > 0 && (
@@ -132,8 +133,8 @@ export default function EvaluateStudent() {
       <Card elevation={1} sx={{ mb: 3 }}>
         <CardContent sx={{ p: 2.5 }}>
           <Stack direction="row" spacing={2} alignItems="center">
-            <Avatar sx={{ width: 52, height: 52, bgcolor: LAVENDER_BG, color: LAVENDER, fontWeight: 700 }}>
-              {session.studentProfile?.user.avatar || session.studentProfile?.user.name?.[0]}
+            <Avatar src={session.studentProfile?.photoUrl || undefined} sx={{ width: 52, height: 52, bgcolor: LAVENDER_BG, color: LAVENDER, fontWeight: 700 }}>
+              {session.studentProfile?.user.name?.slice(0, 2).toUpperCase() || '?'}
             </Avatar>
             <Box>
               <Typography variant="h6" fontWeight={700}>{session.studentProfile?.user.name}</Typography>

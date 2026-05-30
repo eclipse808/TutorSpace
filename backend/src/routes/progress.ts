@@ -181,20 +181,26 @@ progressRouter.get('/by-subject', async (req: AuthRequest, res: Response): Promi
   const scoredCriteriaIds = new Set(allScores.map((s) => s.criteriaId));
 
   const currentScores: Record<string, number> = {};
+  const currentNotes: Record<string, string> = {};
   for (const cId of criteriaIds) {
     const cs = allScores.filter((s) => s.criteriaId === cId);
-    if (cs.length) currentScores[cId] = cs[cs.length - 1].score;
+    if (cs.length) {
+      const latest = cs[cs.length - 1];
+      currentScores[cId] = latest.score;
+      if (latest.note) currentNotes[cId] = latest.note;
+    }
   }
 
-  const subjectMap: Record<string, { criteria: typeof criteria; currentScores: Record<string, number> }> = {};
+  const subjectMap: Record<string, { criteria: typeof criteria; currentScores: Record<string, number>; currentNotes: Record<string, string> }> = {};
   for (const c of criteria) {
     const hasSession = sessionSubjects.has(c.subject);
     const hasScore = scoredCriteriaIds.has(c.id);
     if (!hasSession && !hasScore) continue;
 
-    if (!subjectMap[c.subject]) subjectMap[c.subject] = { criteria: [], currentScores: {} };
+    if (!subjectMap[c.subject]) subjectMap[c.subject] = { criteria: [], currentScores: {}, currentNotes: {} };
     subjectMap[c.subject].criteria.push(c);
     if (currentScores[c.id] !== undefined) subjectMap[c.subject].currentScores[c.id] = currentScores[c.id];
+    if (currentNotes[c.id]) subjectMap[c.subject].currentNotes[c.id] = currentNotes[c.id];
   }
 
   res.json(subjectMap);

@@ -85,12 +85,15 @@ reviewsRouter.post('/', authenticate, async (req: AuthRequest, res: Response): P
       },
     });
 
-    // Update tutor's rating and reviewCount
-    const allReviews = await prisma.review.findMany({ where: { tutorProfileId }, select: { rating: true } });
-    const avgRating = allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length;
+    // Update tutor's rating and reviewCount using aggregation (avoids manual calculation race condition)
+    const agg = await prisma.review.aggregate({
+      where: { tutorProfileId },
+      _avg: { rating: true },
+      _count: { rating: true },
+    });
     const updatedTutor = await prisma.tutorProfile.update({
       where: { id: tutorProfileId },
-      data: { rating: Math.round(avgRating * 10) / 10, reviewCount: allReviews.length },
+      data: { rating: Math.round((agg._avg.rating ?? 0) * 10) / 10, reviewCount: agg._count.rating },
       select: { userId: true },
     });
 
@@ -125,14 +128,15 @@ reviewsRouter.delete('/:id', authenticate, async (req: AuthRequest, res: Respons
     const { tutorProfileId } = review;
     await prisma.review.delete({ where: { id: req.params.id } });
 
-    // Recalculate tutor rating
-    const allReviews = await prisma.review.findMany({ where: { tutorProfileId }, select: { rating: true } });
-    const avgRating = allReviews.length > 0
-      ? allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length
-      : 0;
+    // Recalculate tutor rating using aggregation
+    const agg = await prisma.review.aggregate({
+      where: { tutorProfileId },
+      _avg: { rating: true },
+      _count: { rating: true },
+    });
     await prisma.tutorProfile.update({
       where: { id: tutorProfileId },
-      data: { rating: Math.round(avgRating * 10) / 10, reviewCount: allReviews.length },
+      data: { rating: Math.round((agg._avg.rating ?? 0) * 10) / 10, reviewCount: agg._count.rating },
     });
 
     res.json({ ok: true });
