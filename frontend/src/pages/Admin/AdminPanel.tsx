@@ -21,6 +21,7 @@ import GroupIcon from '@mui/icons-material/Group';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import DoNotDisturbIcon from '@mui/icons-material/DoNotDisturb';
+import HistoryIcon from '@mui/icons-material/History';
 import api from '../../api/client';
 import { TutorProfile, TutorStatus, SubjectRequest, SubjectRequestStatus } from '../../types';
 import { PageLoader } from '../../components/Common/LoadingSpinner';
@@ -329,6 +330,25 @@ export default function AdminPanel() {
   const [profileNote, setProfileNote] = useState('');
   const [profileProcessing, setProfileProcessing] = useState(false);
 
+  // ── audit log ───────────────────────────────────────────────────────────────
+  type LogEntry = { id: string; action: string; targetName: string; details?: string | null; createdAt: string; admin: { name: string } };
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [logsTotal, setLogsTotal] = useState(0);
+  const [logsFetched, setLogsFetched] = useState(false);
+
+  const fetchLogs = async (offset = 0) => {
+    setLogsLoading(true);
+    try {
+      const { data } = await api.get(`/admin/logs?limit=50&offset=${offset}`);
+      setLogs((prev) => offset === 0 ? data.logs : [...prev, ...data.logs]);
+      setLogsTotal(data.total);
+      setLogsFetched(true);
+    } finally { setLogsLoading(false); }
+  };
+
+  useEffect(() => { if (mainTab === 3 && !logsFetched) fetchLogs(); }, [mainTab]);
+
   useEffect(() => {
     (async () => {
       setTutorsLoading(true);
@@ -430,6 +450,7 @@ export default function AdminPanel() {
         <Tab label={<TabLabel icon={<PeopleIcon sx={{ fontSize: 18 }} />} text="Репетиторы" count={tutorCounts.PENDING} />} />
         <Tab label={<TabLabel icon={<MenuBookIcon sx={{ fontSize: 18 }} />} text="Предметы" count={subjectCounts.PENDING} />} />
         <Tab label={<TabLabel icon={<EditNoteIcon sx={{ fontSize: 18 }} />} text="Профили" count={profileChanges.filter(r => r.status === 'PENDING').length} />} />
+        <Tab label={<TabLabel icon={<HistoryIcon sx={{ fontSize: 18 }} />} text="Журнал" count={0} />} />
       </Tabs>
 
       {/* ── TUTORS ── */}
@@ -751,6 +772,62 @@ export default function AdminPanel() {
           onApprove={() => handleProfileReview('approve')}
         />
       </Dialog>
+
+      {/* ── AUDIT LOG ── */}
+      {mainTab === 3 && (
+        <Box>
+          <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
+            <Typography variant="body2" color="text.secondary">
+              {logsTotal} записей · только чтение
+            </Typography>
+            <Button size="small" startIcon={<HistoryIcon />} onClick={() => fetchLogs(0)} disabled={logsLoading}>
+              Обновить
+            </Button>
+          </Stack>
+
+          {logsLoading && logs.length === 0 ? <PageLoader /> : logs.length === 0 ? (
+            <EmptyState icon={<HistoryIcon sx={{ fontSize: 48 }} />} text="Журнал пуст — действия появятся после первых решений" />
+          ) : (
+            <Stack spacing={1}>
+              {logs.map((entry) => {
+                const cfg: Record<string, { label: string; color: string; bg: string }> = {
+                  TUTOR_APPROVED:   { label: 'Репетитор одобрен',    color: '#16a34a', bg: '#F0FDF4' },
+                  TUTOR_REJECTED:   { label: 'Репетитор отклонён',   color: '#dc2626', bg: '#FEF2F2' },
+                  TUTOR_SUSPENDED:  { label: 'Репетитор отстранён',  color: '#d97706', bg: '#FFFBEB' },
+                  SUBJECT_APPROVED: { label: 'Предмет одобрен',      color: '#16a34a', bg: '#F0FDF4' },
+                  SUBJECT_REJECTED: { label: 'Предмет отклонён',     color: '#dc2626', bg: '#FEF2F2' },
+                  PROFILE_APPROVED: { label: 'Профиль одобрен',      color: '#7C5CBF', bg: '#F0EBF8' },
+                  PROFILE_REJECTED: { label: 'Профиль отклонён',     color: '#dc2626', bg: '#FEF2F2' },
+                };
+                const c = cfg[entry.action] ?? { label: entry.action, color: '#6B7280', bg: '#F9FAFB' };
+                return (
+                  <Card key={entry.id} elevation={0} sx={{ border: '1px solid #F0EBF8' }}>
+                    <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
+                      <Stack direction="row" alignItems="center" spacing={1.5} flexWrap="wrap" gap={0.5}>
+                        <Chip label={c.label} size="small"
+                          sx={{ bgcolor: c.bg, color: c.color, fontWeight: 700, fontSize: 11, border: `1px solid ${c.color}22` }} />
+                        <Typography variant="body2" fontWeight={600} color="text.primary">{entry.targetName}</Typography>
+                        {entry.details && (
+                          <Typography variant="caption" color="text.secondary">— {entry.details}</Typography>
+                        )}
+                        <Box sx={{ flexGrow: 1 }} />
+                        <Typography variant="caption" color="text.disabled" sx={{ whiteSpace: 'nowrap' }}>
+                          {new Date(entry.createdAt).toLocaleString('ru', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        </Typography>
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+              {logs.length < logsTotal && (
+                <Button variant="outlined" onClick={() => fetchLogs(logs.length)} disabled={logsLoading} sx={{ mt: 1 }}>
+                  {logsLoading ? 'Загрузка...' : `Загрузить ещё (${logsTotal - logs.length})`}
+                </Button>
+              )}
+            </Stack>
+          )}
+        </Box>
+      )}
     </Box>
   );
 }

@@ -10,7 +10,7 @@ const BCRYPT_ROUNDS = 8; // 10 rounds in Docker = 1-3s per request; 8 rounds ≈
 
 authRouter.post('/register', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, password, name, role } = req.body;
+    const { email, password, name, role, grade, learningGoal } = req.body;
     if (!email || !password || !name || !role) {
       res.status(400).json({ error: 'Все поля обязательны' });
       return;
@@ -38,12 +38,12 @@ authRouter.post('/register', async (req: Request, res: Response): Promise<void> 
         avatar: name.trim().split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2),
         ...(role === 'TUTOR'
           ? { tutorProfile: { create: { subjects: [], hourlyRate: 0, experience: 0 } } }
-          : { studentProfile: { create: {} } }),
+          : { studentProfile: { create: { grade: grade || null, learningGoal: learningGoal || null } } }),
       },
       include: { tutorProfile: { select: { id: true, status: true } }, studentProfile: { select: { id: true } } },
     });
 
-    const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET || 'secret', { expiresIn: '7d' });
+    const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET ?? (() => { throw new Error('JWT_SECRET not set'); })(), { expiresIn: '7d' });
     const tutorStatus = user.tutorProfile?.status ?? null;
     res.json({
       token,
@@ -70,7 +70,7 @@ authRouter.post('/login', async (req: Request, res: Response): Promise<void> => 
       res.status(401).json({ error: 'Неверный email или пароль' });
       return;
     }
-    const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET || 'secret', { expiresIn: '7d' });
+    const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET ?? (() => { throw new Error('JWT_SECRET not set'); })(), { expiresIn: '7d' });
     const tutorStatus = user.tutorProfile?.status ?? null;
     res.json({
       token,
@@ -90,13 +90,40 @@ authRouter.get('/me', authenticate, async (req: AuthRequest, res: Response): Pro
     });
     if (!user) { res.status(404).json({ error: 'Not found' }); return; }
     const tutorStatus = user.tutorProfile?.status ?? null;
+
     res.json({
       id: user.id, email: user.email, name: user.name, role: user.role, avatar: user.avatar,
       xp: user.xp, level: user.level, tutorStatus,
-      tutorProfile: user.tutorProfile, studentProfile: user.studentProfile,
+      tutorProfile: user.tutorProfile,
+      studentProfile: user.studentProfile,
     });
   } catch (err) {
     console.error('Me error:', err);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+authRouter.put('/password', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      res.status(400).json({ error: 'Требуются текущий и новый пароль' }); return;
+    }
+    if (newPassword.length < 6) {
+      res.status(400).json({ error: 'Новый пароль должен быть не менее 6 символов' }); return;
+    }
+    if (currentPassword === newPassword) {
+      res.status(400).json({ error: 'Новый пароль совпадает с текущим' }); return;
+    }
+    const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
+    if (!user) { res.status(404).json({ error: 'Not found' }); return; }
+    const valid = await bcrypt.compare(currentPassword, user.password);
+    if (!valid) { res.status(400).json({ error: 'Текущий пароль неверный' }); return; }
+    const hashed = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+    await prisma.user.update({ where: { id: req.user!.id }, data: { password: hashed } });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Password change error:', err);
     res.status(500).json({ error: 'Ошибка сервера' });
   }
 });

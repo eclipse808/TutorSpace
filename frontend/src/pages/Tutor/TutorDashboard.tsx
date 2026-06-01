@@ -4,7 +4,7 @@ import {
   Box, Typography, Card, CardContent, Grid, Stack, Button, Avatar,
   Chip, Divider, LinearProgress, Dialog, DialogTitle, DialogContent,
   DialogActions, TextField, Select, MenuItem, FormControl, InputLabel,
-  Alert, CircularProgress, Tab, Tabs, IconButton,
+  Alert, CircularProgress, Tab, Tabs, IconButton, InputAdornment,
 } from '@mui/material';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import PeopleIcon from '@mui/icons-material/People';
@@ -20,12 +20,15 @@ import AttachFileIcon from '@mui/icons-material/AttachFile';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import EditIcon from '@mui/icons-material/Edit';
 import UploadIcon from '@mui/icons-material/Upload';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import { useAuthStore } from '../../store/authStore';
 import { Session, StudentProfile, TutorProfile } from '../../types';
 import { PageLoader } from '../../components/Common/LoadingSpinner';
 import { format, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import api from '../../api/client';
+import { getEarnedTutorBadges, getTutorLevel } from '../../utils/tutorBadges';
 
 const ALL_SUBJECTS = [
   'Математика', 'Алгебра', 'Геометрия', 'Физика', 'Химия', 'Биология',
@@ -36,47 +39,6 @@ const ALL_SUBJECTS = [
 const LAVENDER = '#7C5CBF';
 const LAVENDER_BG = '#F0EBF8';
 
-const TUTOR_XP_THRESHOLDS = [0, 200, 800, 2000, 5000, 12000];
-const TUTOR_LEVEL_NAMES = ['Новичок', 'Практик', 'Опытный', 'Эксперт', 'Мастер', 'Гуру'];
-const TUTOR_LEVEL_REWARDS = [
-  '',
-  '🏷️ Бейдж на профиле',
-  '🔍 Приоритет в поиске',
-  '✅ Статус "Проверенный"',
-  '⭐ Выделение в каталоге',
-  '👑 Элитный репетитор',
-];
-
-function getTutorLevel(xp: number) {
-  const idx = TUTOR_XP_THRESHOLDS.filter((t) => xp >= t).length - 1;
-  const safeIdx = Math.max(0, idx);
-  const cur = TUTOR_XP_THRESHOLDS[safeIdx];
-  const next = TUTOR_XP_THRESHOLDS[safeIdx + 1] ?? null;
-  const progress = next ? Math.min(100, ((xp - cur) / (next - cur)) * 100) : 100;
-  return {
-    level: safeIdx + 1,
-    name: TUTOR_LEVEL_NAMES[safeIdx],
-    reward: TUTOR_LEVEL_REWARDS[safeIdx],
-    nextReward: TUTOR_LEVEL_REWARDS[safeIdx + 1] ?? null,
-    cur, next, progress, xp,
-  };
-}
-
-function getTutorBadges(completed: number, rating: number, reviewCount: number, createdAt?: string) {
-  const badges: { icon: string; label: string }[] = [];
-  if (completed >= 1) badges.push({ icon: '🎓', label: 'Первое занятие' });
-  if (completed >= 10) badges.push({ icon: '🔟', label: 'Десятка' });
-  if (completed >= 50) badges.push({ icon: '🏆', label: 'Полсотни' });
-  if (completed >= 100) badges.push({ icon: '💯', label: 'Сотня' });
-  if (reviewCount >= 10) badges.push({ icon: '💬', label: '10 отзывов' });
-  if (rating >= 4.5 && reviewCount >= 3) badges.push({ icon: '⭐', label: 'Высокий рейтинг' });
-  if (rating >= 4.9 && reviewCount >= 5) badges.push({ icon: '🌟', label: 'Идеальный рейтинг' });
-  if (createdAt) {
-    const msOnSite = Date.now() - new Date(createdAt).getTime();
-    if (msOnSite >= 365 * 24 * 60 * 60 * 1000) badges.push({ icon: '📅', label: 'Год на сайте' });
-  }
-  return badges;
-}
 
 export default function TutorDashboard() {
   const { user } = useAuthStore();
@@ -107,6 +69,9 @@ export default function TutorDashboard() {
   const [profileSaving, setProfileSaving] = useState(false);
   const [editSuccess, setEditSuccess] = useState('');
   const [editError, setEditError] = useState('');
+  const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' });
+  const [pwSaving, setPwSaving] = useState(false);
+  const [showPw, setShowPw] = useState({ current: false, next: false, confirm: false });
   const photoRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -157,9 +122,33 @@ export default function TutorDashboard() {
     setPhotoFile(null);
     setRateValue(String(tutorProfile?.hourlyRate ?? ''));
     setProfileForm({ bio: tutorProfile?.bio || '', education: tutorProfile?.education || '', experience: String(tutorProfile?.experience ?? '') });
+    setPwForm({ current: '', next: '', confirm: '' });
+    setShowPw({ current: false, next: false, confirm: false });
     setEditSuccess('');
     setEditError('');
     setEditDialog(true);
+  };
+
+  const savePassword = async () => {
+    if (!pwForm.current || !pwForm.next || !pwForm.confirm) {
+      setEditError('Заполните все поля'); return;
+    }
+    if (pwForm.next !== pwForm.confirm) {
+      setEditError('Новые пароли не совпадают'); return;
+    }
+    if (pwForm.next.length < 6) {
+      setEditError('Новый пароль должен быть не менее 6 символов'); return;
+    }
+    setPwSaving(true); setEditError('');
+    try {
+      await api.put('/auth/password', { currentPassword: pwForm.current, newPassword: pwForm.next });
+      setEditSuccess('Пароль успешно изменён');
+      setPwForm({ current: '', next: '', confirm: '' });
+    } catch (err: any) {
+      setEditError(err.response?.data?.error || 'Ошибка сохранения');
+    } finally {
+      setPwSaving(false);
+    }
   };
 
   const savePhoto = async () => {
@@ -229,7 +218,12 @@ export default function TutorDashboard() {
   const tutorXp = (tutorProfile as any)?.user?.xp ?? 0;
   const tutorCreatedAt = (tutorProfile as any)?.user?.createdAt;
   const tutorLevel = getTutorLevel(tutorXp);
-  const tutorBadges = getTutorBadges(completedSessions, tutorProfile?.rating ?? 0, tutorProfile?.reviewCount ?? 0, tutorCreatedAt);
+  const tutorBadges = getEarnedTutorBadges({
+    completed: completedSessions,
+    rating: tutorProfile?.rating ?? 0,
+    reviewCount: tutorProfile?.reviewCount ?? 0,
+    createdAt: tutorCreatedAt,
+  });
   const photoSrc = tutorProfile?.photoUrl || '';
 
   return (
@@ -457,10 +451,11 @@ export default function TutorDashboard() {
       <Dialog open={editDialog} onClose={() => setEditDialog(false)} maxWidth="sm" fullWidth>
         <DialogTitle fontWeight={700}>Редактирование профиля</DialogTitle>
         <Box sx={{ px: 3 }}>
-          <Tabs value={editTab} onChange={(_, v) => { setEditTab(v); setEditSuccess(''); setEditError(''); }} sx={{ borderBottom: '1px solid #F0EBF8', mb: 1 }}>
+          <Tabs value={editTab} onChange={(_, v) => { setEditTab(v); setEditSuccess(''); setEditError(''); setPwForm({ current: '', next: '', confirm: '' }); setShowPw({ current: false, next: false, confirm: false }); }} sx={{ borderBottom: '1px solid #F0EBF8', mb: 1 }}>
             <Tab label="Фото" sx={{ textTransform: 'none', fontWeight: 600, fontSize: 13 }} />
             <Tab label="Ставка" sx={{ textTransform: 'none', fontWeight: 600, fontSize: 13 }} />
             <Tab label="Описание" sx={{ textTransform: 'none', fontWeight: 600, fontSize: 13 }} />
+            <Tab label="Пароль" sx={{ textTransform: 'none', fontWeight: 600, fontSize: 13 }} />
           </Tabs>
         </Box>
         <DialogContent>
@@ -557,6 +552,60 @@ export default function TutorDashboard() {
               />
             </Stack>
           )}
+
+          {/* Tab 3: Password */}
+          {editTab === 3 && (
+            <Stack spacing={2.5} sx={{ pt: 1 }}>
+              <TextField
+                label="Текущий пароль"
+                type={showPw.current ? 'text' : 'password'}
+                value={pwForm.current}
+                onChange={(e) => setPwForm((f) => ({ ...f, current: e.target.value }))}
+                autoComplete="current-password"
+                fullWidth
+                InputProps={{ endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton size="small" onClick={() => setShowPw((s) => ({ ...s, current: !s.current }))}>
+                      {showPw.current ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+                    </IconButton>
+                  </InputAdornment>
+                )}}
+              />
+              <TextField
+                label="Новый пароль"
+                type={showPw.next ? 'text' : 'password'}
+                value={pwForm.next}
+                onChange={(e) => setPwForm((f) => ({ ...f, next: e.target.value }))}
+                autoComplete="new-password"
+                helperText="Минимум 6 символов"
+                fullWidth
+                InputProps={{ endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton size="small" onClick={() => setShowPw((s) => ({ ...s, next: !s.next }))}>
+                      {showPw.next ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+                    </IconButton>
+                  </InputAdornment>
+                )}}
+              />
+              <TextField
+                label="Повторите новый пароль"
+                type={showPw.confirm ? 'text' : 'password'}
+                value={pwForm.confirm}
+                onChange={(e) => setPwForm((f) => ({ ...f, confirm: e.target.value }))}
+                autoComplete="new-password"
+                error={!!pwForm.confirm && pwForm.next !== pwForm.confirm}
+                helperText={pwForm.confirm && pwForm.next !== pwForm.confirm ? 'Пароли не совпадают' : ''}
+                fullWidth
+                InputProps={{ endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton size="small" onClick={() => setShowPw((s) => ({ ...s, confirm: !s.confirm }))}>
+                      {showPw.confirm ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+                    </IconButton>
+                  </InputAdornment>
+                )}}
+              />
+            </Stack>
+          )}
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 3, gap: 1 }}>
           <Button variant="outlined" onClick={() => setEditDialog(false)} sx={{ flex: 1 }}>Закрыть</Button>
@@ -580,6 +629,17 @@ export default function TutorDashboard() {
               sx={{ flex: 1 }}
             >
               {profileSaving ? 'Отправка...' : 'Отправить на проверку'}
+            </Button>
+          )}
+          {editTab === 3 && (
+            <Button
+              variant="contained"
+              onClick={savePassword}
+              disabled={pwSaving || !pwForm.current || !pwForm.next || !pwForm.confirm || pwForm.next !== pwForm.confirm}
+              startIcon={pwSaving ? <CircularProgress size={16} color="inherit" /> : null}
+              sx={{ flex: 1 }}
+            >
+              {pwSaving ? 'Сохранение...' : 'Изменить пароль'}
             </Button>
           )}
         </DialogActions>

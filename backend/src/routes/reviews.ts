@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { awardTutorXP, TUTOR_REVIEW_XP } from '../utils/xp';
+import { checkAndAwardAchievements } from '../utils/achievements';
 
 export const reviewsRouter = Router();
 
@@ -59,6 +60,9 @@ reviewsRouter.post('/', authenticate, async (req: AuthRequest, res: Response): P
   if (!tutorProfileId || !rating || rating < 1 || rating > 5) {
     res.status(400).json({ error: 'tutorProfileId and rating (1-5) required' }); return;
   }
+  if (text && text.length > 3000) {
+    res.status(400).json({ error: 'Текст отзыва не может быть длиннее 3000 символов' }); return;
+  }
 
   try {
     const profile = await prisma.studentProfile.findUnique({ where: { userId: req.user!.id } });
@@ -70,10 +74,10 @@ reviewsRouter.post('/', authenticate, async (req: AuthRequest, res: Response): P
     });
     if (existingReview) { res.status(400).json({ error: 'Вы уже оставили отзыв этому репетитору' }); return; }
 
-    // Check if session exists and is completed
+    // Check if session exists, is completed, and belongs to the reviewed tutor
     if (sessionId) {
       const session = await prisma.session.findFirst({
-        where: { id: sessionId, studentProfileId: profile.id, status: 'COMPLETED' },
+        where: { id: sessionId, studentProfileId: profile.id, tutorProfileId, status: 'COMPLETED' },
       });
       if (!session) { res.status(400).json({ error: 'Session not found or not completed' }); return; }
     }
@@ -98,6 +102,9 @@ reviewsRouter.post('/', authenticate, async (req: AuthRequest, res: Response): P
     });
 
     await awardTutorXP(updatedTutor.userId, TUTOR_REVIEW_XP, prisma);
+
+    // Check if student earned "Первый отзыв" achievement
+    await checkAndAwardAchievements(profile.id, prisma, req.user!.id);
 
     res.status(201).json(review);
   } catch (err: any) {

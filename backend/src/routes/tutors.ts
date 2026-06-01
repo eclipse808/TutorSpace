@@ -5,27 +5,33 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 export const tutorsRouter = Router();
 
 tutorsRouter.get('/', async (req, res) => {
-  const { subject, search, minRate, maxRate, minRating } = req.query;
+  const { subject, search, minRate, maxRate, minRating, minExperience } = req.query;
+
+  const parsedMinRate     = minRate      ? Number(minRate)      : NaN;
+  const parsedMaxRate     = maxRate      ? Number(maxRate)      : NaN;
+  const parsedMinRating   = minRating    ? Number(minRating)    : NaN;
+  const parsedMinExp      = minExperience ? Number(minExperience) : NaN;
+
   const tutors = await prisma.tutorProfile.findMany({
     where: {
       status: 'APPROVED',
       ...(subject ? { subjects: { has: subject as string } } : {}),
       ...(search ? { user: { name: { contains: search as string, mode: 'insensitive' } } } : {}),
-      ...(minRate || maxRate ? {
+      ...(!isNaN(parsedMinRate) || !isNaN(parsedMaxRate) ? {
         hourlyRate: {
-          ...(minRate ? { gte: Number(minRate) } : {}),
-          ...(maxRate ? { lte: Number(maxRate) } : {}),
+          ...(!isNaN(parsedMinRate) ? { gte: parsedMinRate } : {}),
+          ...(!isNaN(parsedMaxRate) ? { lte: parsedMaxRate } : {}),
         },
       } : {}),
+      ...(!isNaN(parsedMinExp) ? { experience: { gte: parsedMinExp } } : {}),
     },
     include: {
       user: { select: { id: true, name: true, email: true, avatar: true, xp: true, createdAt: true } },
       _count: { select: { reviews: true } },
     },
-    orderBy: { rating: 'desc' },
   });
 
-  // Real ratings from actual reviews
+  // Recalculate real ratings from actual reviews
   const ratingAgg = await prisma.review.groupBy({
     by: ['tutorProfileId'],
     _avg: { rating: true },
@@ -39,8 +45,9 @@ tutorsRouter.get('/', async (req, res) => {
     rating: Math.round((ratingMap.get(t.id) ?? 0) * 10) / 10,
   }));
 
-  // Apply minRating filter on real rating (post-compute)
-  const filtered = minRating ? result.filter((t) => t.rating >= Number(minRating)) : result;
+  // Apply minRating filter and sort by real rating descending
+  const filtered = !isNaN(parsedMinRating) ? result.filter((t) => t.rating >= parsedMinRating) : result;
+  filtered.sort((a, b) => b.rating - a.rating);
   res.json(filtered);
 });
 
@@ -102,7 +109,7 @@ tutorsRouter.get('/me/students', authenticate, async (req: AuthRequest, res: Res
   if (!tutor) { res.status(404).json({ error: 'Tutor profile not found' }); return; }
 
   const sessions = await prisma.session.findMany({
-    where: { tutorProfileId: tutor.id },
+    where: { tutorProfileId: tutor.id, status: { not: 'CANCELLED' } },
     include: { studentProfile: { include: { user: { select: { id: true, name: true, email: true, avatar: true } } } } },
     distinct: ['studentProfileId'],
   });

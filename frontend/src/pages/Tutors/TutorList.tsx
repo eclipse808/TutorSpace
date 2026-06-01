@@ -23,6 +23,7 @@ export default function TutorList() {
   const [minRate, setMinRate] = useState('');
   const [maxRate, setMaxRate] = useState('');
   const [minRating, setMinRating] = useState('');
+  const [minExperience, setMinExperience] = useState('');
   const [sortOrder, setSortOrder] = useState<'rating_desc' | 'price_asc' | 'price_desc'>('rating_desc');
 
   useEffect(() => {
@@ -38,6 +39,7 @@ export default function TutorList() {
       if (minRate) q.set('minRate', minRate);
       if (maxRate) q.set('maxRate', maxRate);
       if (minRating) q.set('minRating', minRating);
+      if (minExperience) q.set('minExperience', minExperience);
       const { data } = await api.get(`/tutors?${q}`);
       setTutors(data);
     } finally {
@@ -46,7 +48,7 @@ export default function TutorList() {
   };
 
   useEffect(() => { api.get('/tutors/subjects').then((r) => setSubjects(r.data)); }, []);
-  useEffect(() => { fetchTutors(); }, [selectedSubject, minRating]);
+  useEffect(() => { fetchTutors(); }, [selectedSubject, minRating, minExperience]);
 
   const handleSearch = (e: React.FormEvent) => { e.preventDefault(); fetchTutors(); };
   const sortedTutors = [...tutors].sort((a, b) => {
@@ -55,8 +57,8 @@ export default function TutorList() {
     return b.rating - a.rating;
   });
 
-  const resetFilters = () => { setSearch(''); setSelectedSubject(''); setMinRate(''); setMaxRate(''); setMinRating(''); setSortOrder('rating_desc'); };
-  const hasActiveFilters = !!(selectedSubject || minRate || maxRate || minRating);
+  const resetFilters = () => { setSearch(''); setSelectedSubject(''); setMinRate(''); setMaxRate(''); setMinRating(''); setMinExperience(''); setSortOrder('rating_desc'); };
+  const hasActiveFilters = !!(selectedSubject || minRate || maxRate || minRating || minExperience);
 
   return (
     <Box>
@@ -106,6 +108,19 @@ export default function TutorList() {
                     <MenuItem value="4">4+</MenuItem>
                     <MenuItem value="4.5">4.5+</MenuItem>
                     <MenuItem value="4.8">4.8+</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <FormControl fullWidth>
+                  <InputLabel>Опыт от</InputLabel>
+                  <Select value={minExperience} label="Опыт от" onChange={(e) => setMinExperience(e.target.value)}>
+                    <MenuItem value="">Любой</MenuItem>
+                    <MenuItem value="1">от 1 года</MenuItem>
+                    <MenuItem value="2">от 2 лет</MenuItem>
+                    <MenuItem value="3">от 3 лет</MenuItem>
+                    <MenuItem value="5">от 5 лет</MenuItem>
+                    <MenuItem value="10">от 10 лет</MenuItem>
                   </Select>
                 </FormControl>
               </Grid>

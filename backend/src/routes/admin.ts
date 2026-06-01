@@ -12,6 +12,17 @@ function requireAdmin(req: Request, res: Response, next: NextFunction): void {
   next();
 }
 
+// Helper: write an audit log entry
+async function log(adminId: string, action: string, targetType: string, targetId: string, targetName: string, details?: string) {
+  try {
+    await prisma.adminLog.create({ data: { adminId, action, targetType, targetId, targetName, details: details || null } });
+  } catch (e) {
+    console.error('Audit log write failed:', e);
+  }
+}
+
+// ── Tutors ────────────────────────────────────────────────────────────────────
+
 adminRouter.get('/tutors/pending', requireAdmin, async (_req: Request, res: Response): Promise<void> => {
   try {
     const tutors = await prisma.tutorProfile.findMany({
@@ -20,10 +31,7 @@ adminRouter.get('/tutors/pending', requireAdmin, async (_req: Request, res: Resp
       orderBy: { user: { createdAt: 'desc' } },
     });
     res.json(tutors);
-  } catch (err) {
-    console.error('Admin pending error:', err);
-    res.status(500).json({ error: 'Ошибка сервера' });
-  }
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Ошибка сервера' }); }
 });
 
 adminRouter.get('/tutors/all', requireAdmin, async (_req: Request, res: Response): Promise<void> => {
@@ -33,43 +41,38 @@ adminRouter.get('/tutors/all', requireAdmin, async (_req: Request, res: Response
       orderBy: { user: { createdAt: 'desc' } },
     });
     res.json(tutors);
-  } catch (err) {
-    console.error('Admin all error:', err);
-    res.status(500).json({ error: 'Ошибка сервера' });
-  }
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Ошибка сервера' }); }
 });
 
 adminRouter.put('/tutors/:id/approve', requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
+    const adminId = (req as AuthRequest).user!.id;
     const tutor = await prisma.tutorProfile.update({
       where: { id: req.params.id },
       data: { status: 'APPROVED' },
       include: { user: { select: { id: true, name: true, email: true } } },
     });
+    await log(adminId, 'TUTOR_APPROVED', 'TUTOR', req.params.id, tutor.user.name);
     res.json(tutor);
-  } catch (err) {
-    console.error('Admin approve error:', err);
-    res.status(500).json({ error: 'Ошибка сервера' });
-  }
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Ошибка сервера' }); }
 });
 
 adminRouter.put('/tutors/:id/reject', requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
+    const adminId = (req as AuthRequest).user!.id;
     const tutor = await prisma.tutorProfile.update({
       where: { id: req.params.id },
       data: { status: 'REJECTED' },
       include: { user: { select: { id: true, name: true, email: true } } },
     });
+    await log(adminId, 'TUTOR_REJECTED', 'TUTOR', req.params.id, tutor.user.name);
     res.json(tutor);
-  } catch (err) {
-    console.error('Admin reject error:', err);
-    res.status(500).json({ error: 'Ошибка сервера' });
-  }
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Ошибка сервера' }); }
 });
 
-// PUT /admin/tutors/:id/suspend — suspend approved tutor back to PENDING review
 adminRouter.put('/tutors/:id/suspend', requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
+    const adminId = (req as AuthRequest).user!.id;
     const tutor = await prisma.tutorProfile.findUnique({
       where: { id: req.params.id },
       include: { user: { select: { id: true, name: true, email: true } } },
@@ -77,7 +80,6 @@ adminRouter.put('/tutors/:id/suspend', requireAdmin, async (req: Request, res: R
     if (!tutor) { res.status(404).json({ error: 'Not found' }); return; }
 
     const reason = (req as AuthRequest).body?.reason || '';
-
     const [updated] = await Promise.all([
       prisma.tutorProfile.update({
         where: { id: req.params.id },
@@ -94,39 +96,30 @@ adminRouter.put('/tutors/:id/suspend', requireAdmin, async (req: Request, res: R
         },
       }),
     ]);
-
+    await log(adminId, 'TUTOR_SUSPENDED', 'TUTOR', req.params.id, tutor.user.name, reason || undefined);
     res.json(updated);
-  } catch (err) {
-    console.error('Admin suspend error:', err);
-    res.status(500).json({ error: 'Ошибка сервера' });
-  }
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Ошибка сервера' }); }
 });
 
-// GET /admin/profile-changes — pending profile change requests
+// ── Profile change requests ───────────────────────────────────────────────────
+
 adminRouter.get('/profile-changes', requireAdmin, async (_req: Request, res: Response): Promise<void> => {
   try {
     const requests = await prisma.profileChangeRequest.findMany({
       where: { status: 'PENDING' },
-      include: {
-        tutorProfile: {
-          include: { user: { select: { id: true, name: true, email: true, avatar: true } } },
-        },
-      },
+      include: { tutorProfile: { include: { user: { select: { id: true, name: true, email: true, avatar: true } } } } },
       orderBy: { createdAt: 'desc' },
     });
     res.json(requests);
-  } catch (err) {
-    console.error('Profile changes list error:', err);
-    res.status(500).json({ error: 'Ошибка сервера' });
-  }
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Ошибка сервера' }); }
 });
 
-// PUT /admin/profile-changes/:id/approve
 adminRouter.put('/profile-changes/:id/approve', requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
+    const adminId = (req as AuthRequest).user!.id;
     const change = await prisma.profileChangeRequest.findUnique({
       where: { id: req.params.id },
-      include: { tutorProfile: { select: { userId: true } } },
+      include: { tutorProfile: { include: { user: { select: { id: true, name: true } } } } },
     });
     if (!change) { res.status(404).json({ error: 'Not found' }); return; }
 
@@ -138,54 +131,57 @@ adminRouter.put('/profile-changes/:id/approve', requireAdmin, async (req: Reques
     const [updated] = await Promise.all([
       prisma.profileChangeRequest.update({
         where: { id: req.params.id },
-        data: { status: 'APPROVED', reviewedAt: new Date(), adminNote: (req as AuthRequest).body?.adminNote || null },
+        data: { status: 'APPROVED', reviewedAt: new Date(), adminNote: req.body?.adminNote || null },
       }),
       prisma.tutorProfile.update({ where: { id: change.tutorProfileId }, data: updateData }),
       prisma.notification.create({
-        data: {
-          userId: change.tutorProfile.userId,
-          type: 'SUCCESS',
-          title: 'Изменения профиля одобрены',
-          message: 'Ваши изменения профиля успешно применены.',
-          link: '/tutor/dashboard',
-        },
+        data: { userId: change.tutorProfile.userId, type: 'SUCCESS', title: 'Изменения профиля одобрены', message: 'Ваши изменения профиля успешно применены.', link: '/tutor/dashboard' },
       }),
     ]);
+    await log(adminId, 'PROFILE_APPROVED', 'PROFILE_CHANGE', req.params.id, change.tutorProfile.user.name);
     res.json(updated);
-  } catch (err) {
-    console.error('Profile change approve error:', err);
-    res.status(500).json({ error: 'Ошибка сервера' });
-  }
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Ошибка сервера' }); }
 });
 
-// PUT /admin/profile-changes/:id/reject
 adminRouter.put('/profile-changes/:id/reject', requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
+    const adminId = (req as AuthRequest).user!.id;
     const change = await prisma.profileChangeRequest.findUnique({
       where: { id: req.params.id },
-      include: { tutorProfile: { select: { userId: true } } },
+      include: { tutorProfile: { include: { user: { select: { id: true, name: true } } } } },
     });
     if (!change) { res.status(404).json({ error: 'Not found' }); return; }
 
-    const adminNote = (req as AuthRequest).body?.adminNote || '';
+    const adminNote = req.body?.adminNote || '';
     const [updated] = await Promise.all([
       prisma.profileChangeRequest.update({
         where: { id: req.params.id },
         data: { status: 'REJECTED', reviewedAt: new Date(), adminNote: adminNote || null },
       }),
       prisma.notification.create({
-        data: {
-          userId: change.tutorProfile.userId,
-          type: 'WARNING',
-          title: 'Изменения профиля отклонены',
-          message: `Ваши изменения не одобрены.${adminNote ? ` Причина: ${adminNote}` : ''}`,
-          link: '/tutor/dashboard',
-        },
+        data: { userId: change.tutorProfile.userId, type: 'WARNING', title: 'Изменения профиля отклонены', message: `Ваши изменения не одобрены.${adminNote ? ` Причина: ${adminNote}` : ''}`, link: '/tutor/dashboard' },
       }),
     ]);
+    await log(adminId, 'PROFILE_REJECTED', 'PROFILE_CHANGE', req.params.id, change.tutorProfile.user.name, adminNote || undefined);
     res.json(updated);
-  } catch (err) {
-    console.error('Profile change reject error:', err);
-    res.status(500).json({ error: 'Ошибка сервера' });
-  }
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Ошибка сервера' }); }
+});
+
+// ── Audit log ─────────────────────────────────────────────────────────────────
+
+adminRouter.get('/logs', requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 50, 200);
+    const offset = Number(req.query.offset) || 0;
+    const [logs, total] = await Promise.all([
+      prisma.adminLog.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip: offset,
+        include: { admin: { select: { name: true } } },
+      }),
+      prisma.adminLog.count(),
+    ]);
+    res.json({ logs, total });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Ошибка сервера' }); }
 });

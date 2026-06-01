@@ -13,9 +13,7 @@ import { PageLoader } from '../../components/Common/LoadingSpinner';
 import { format, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import api from '../../api/client';
-
-const LEVEL_THRESHOLDS = [0, 100, 250, 500, 800, 1200, 1700, 2400, 3200, 4200];
-const LEVEL_NAMES = ['Новичок', 'Ученик', 'Знаток', 'Эксперт', 'Мастер', 'Гуру', 'Легенда', 'Чемпион', 'Виртуоз', 'Гений'];
+import { getLevelReward, getLevelProgress, getAvatarFrameSx, effectiveFrame, effectiveBanner } from '../../utils/levelRewards';
 
 const LAVENDER = '#7C5CBF';
 const LAVENDER_BG = '#F0EBF8';
@@ -24,17 +22,12 @@ interface PublicProfile {
   id: string;
   user: { id: string; name: string; avatar?: string; xp: number; level: number };
   photoUrl?: string;
+  grade?: string | null;
+  learningGoal?: string | null;
   completedSessions: number;
+  equippedFrame?: number | null;
+  equippedBanner?: number | null;
   achievements: (Achievement & { earnedAt: string })[];
-}
-
-function getLevelProgress(xp: number, level: number) {
-  const cur = LEVEL_THRESHOLDS[level - 1] ?? 0;
-  const next = LEVEL_THRESHOLDS[level] ?? cur + 1000;
-  return {
-    progress: Math.min(100, Math.max(0, ((xp - cur) / (next - cur)) * 100)),
-    name: LEVEL_NAMES[level - 1] ?? 'Легенда',
-  };
 }
 
 export default function StudentPublicProfile() {
@@ -61,8 +54,12 @@ export default function StudentPublicProfile() {
     );
   }
 
-  const { user, completedSessions, achievements, photoUrl } = profile;
+  const { user, completedSessions, achievements, photoUrl, grade, learningGoal, equippedFrame, equippedBanner } = profile;
   const li = getLevelProgress(user.xp, user.level);
+  const fLevel = effectiveFrame(user.level, equippedFrame);
+  const bLevel = effectiveBanner(user.level, equippedBanner);
+  const reward = getLevelReward(bLevel);
+  const frameSx = getAvatarFrameSx(fLevel);
 
   return (
     <Box sx={{ maxWidth: 680, mx: 'auto' }}>
@@ -71,26 +68,29 @@ export default function StudentPublicProfile() {
       </Button>
 
       {/* Profile header */}
-      <Card elevation={0} sx={{ background: 'linear-gradient(135deg, #7C5CBF, #6A4DAD)', color: 'white', mb: 3, border: 'none' }}>
+      <Card elevation={0} sx={{ background: reward.bannerGradient, color: 'white', mb: 3, border: 'none' }}>
         <CardContent sx={{ p: 3 }}>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={3} alignItems={{ sm: 'center' }}>
-            <Avatar src={photoUrl || undefined} sx={{ width: 80, height: 80, bgcolor: 'rgba(255,255,255,0.25)', fontSize: 22, fontWeight: 700, flexShrink: 0 }}>
-              {user.avatar || user.name.slice(0, 2).toUpperCase()}
+            <Avatar src={photoUrl || undefined} sx={{ width: 80, height: 80, bgcolor: 'rgba(255,255,255,0.25)', fontSize: 22, fontWeight: 700, flexShrink: 0, ...frameSx }}>
+              {user.avatar || user.name?.slice(0, 2)?.toUpperCase() || '?'}
             </Avatar>
             <Box sx={{ flex: 1 }}>
-              <Typography variant="h4" fontWeight={700} sx={{ color: 'white' }}>{user.name}</Typography>
-              <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mt: 1 }}>
+              <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
+                <Typography variant="h4" fontWeight={700} sx={{ color: 'white' }}>{user.name}</Typography>
+                {reward.title && (
+                  <Chip label={reward.title} size="small" sx={{ bgcolor: 'rgba(255,255,255,0.25)', color: 'white', fontWeight: 700, fontSize: 11, height: 20 }} />
+                )}
+              </Stack>
+              <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mt: 1 }} flexWrap="wrap">
                 <Stack direction="row" alignItems="center" spacing={0.5}>
                   <StarIcon sx={{ fontSize: 16, color: '#fbbf24' }} />
                   <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', fontWeight: 600 }}>
                     Уровень {user.level}
                   </Typography>
                 </Stack>
-                <Chip
-                  label={li.name}
-                  size="small"
-                  sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'white', fontSize: 11, height: 22 }}
-                />
+                <Chip label={li.name} size="small" sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'white', fontSize: 11, height: 22 }} />
+                {grade && <Chip label={grade} size="small" sx={{ bgcolor: 'rgba(255,255,255,0.15)', color: 'white', fontSize: 11, height: 22 }} />}
+                {learningGoal && <Chip label={learningGoal} size="small" sx={{ bgcolor: 'rgba(255,255,255,0.15)', color: 'white', fontSize: 11, height: 22 }} />}
               </Stack>
               <Box sx={{ mt: 2 }}>
                 <LinearProgress

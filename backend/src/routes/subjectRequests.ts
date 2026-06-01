@@ -115,6 +115,7 @@ subjectRequestsRouter.put('/:id/approve', async (req: AuthRequest, res: Response
       }),
     ]);
 
+    await prisma.adminLog.create({ data: { adminId: req.user!.id, action: 'SUBJECT_APPROVED', targetType: 'SUBJECT_REQUEST', targetId: req.params.id, targetName: updated.tutorProfile.user.name, details: `Предмет: ${request.subject}` } }).catch(() => {});
     res.json(updated);
   } catch (err) {
     console.error('SubjectRequest approve error:', err);
@@ -150,6 +151,7 @@ subjectRequestsRouter.put('/:id/reject', async (req: AuthRequest, res: Response)
       }),
     ]);
 
+    await prisma.adminLog.create({ data: { adminId: req.user!.id, action: 'SUBJECT_REJECTED', targetType: 'SUBJECT_REQUEST', targetId: req.params.id, targetName: updated.tutorProfile.user.name, details: `Предмет: ${request.subject}${adminNote ? `. Причина: ${adminNote}` : ''}` } }).catch(() => {});
     res.json(updated);
   } catch (err) {
     console.error('SubjectRequest reject error:', err);

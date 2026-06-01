@@ -1,7 +1,8 @@
 import { PrismaClient } from '@prisma/client';
 
 // Cumulative XP required to reach each level (index = level - 1)
-export const LEVEL_THRESHOLDS = [0, 100, 250, 500, 800, 1200, 1700, 2400, 3200, 4200];
+// Must stay in sync with frontend src/utils/levelRewards.ts LEVEL_THRESHOLDS
+export const LEVEL_THRESHOLDS = [0, 80, 200, 500, 800, 1200, 1700, 2400, 3200, 4200];
 
 export const GOAL_XP: Record<string, number> = {
   EASY: 15,
@@ -12,12 +13,15 @@ export const GOAL_XP: Record<string, number> = {
 export const SESSION_XP = 20;
 export const STREAK_BONUS_XP = 10;
 
-// Tutor XP
-export const TUTOR_SESSION_XP = 20;
-export const TUTOR_REVIEW_XP = 15;
+// Tutor XP — slightly higher than student to reward teaching time
+export const TUTOR_SESSION_XP = 25;
+export const TUTOR_REVIEW_XP = 20;
 
-// Tutor XP thresholds (separate from student, computed on frontend only — DB level field unused for tutors)
-export const TUTOR_XP_THRESHOLDS = [0, 200, 800, 2000, 5000, 12000];
+// Tutor XP thresholds — 5 levels, max reachable in ~2 years at average pace
+// Average active tutor (~15 sessions/month, 3 reviews/month ≈ 435 XP/month):
+//   Level 2 < 1 month · Level 3 ≈ 4.5 months · Level 4 ≈ 12 months · Level 5 ≈ 2.3 years
+// Must stay in sync with frontend src/utils/tutorBadges.ts TUTOR_XP_THRESHOLDS
+export const TUTOR_XP_THRESHOLDS = [0, 400, 2000, 5500, 12000];
 
 export function getLevelFromXp(xp: number): number {
   let level = 1;
@@ -31,19 +35,19 @@ export function getLevelFromXp(xp: number): number {
 }
 
 export async function awardXP(userId: string, amount: number, prisma: PrismaClient): Promise<void> {
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { xp: true } });
-  if (!user) return;
-  const newXp = user.xp + amount;
-  const newLevel = getLevelFromXp(newXp);
-  await prisma.user.update({ where: { id: userId }, data: { xp: newXp, level: newLevel } });
+  const updated = await prisma.user.update({
+    where: { id: userId },
+    data: { xp: { increment: amount } },
+    select: { xp: true },
+  });
+  const newLevel = getLevelFromXp(updated.xp);
+  await prisma.user.update({ where: { id: userId }, data: { level: newLevel } });
 }
 
 // Tutor XP: only updates xp, not level (tutor level is computed on frontend using TUTOR_XP_THRESHOLDS)
 export async function awardTutorXP(userId: string, amount: number, prisma: PrismaClient): Promise<void> {
   try {
-    const user = await prisma.user.findUnique({ where: { id: userId }, select: { xp: true } });
-    if (!user) return;
-    await prisma.user.update({ where: { id: userId }, data: { xp: user.xp + amount } });
+    await prisma.user.update({ where: { id: userId }, data: { xp: { increment: amount } } });
   } catch (err) {
     console.error(`Failed to award tutor XP to user ${userId}:`, err);
   }

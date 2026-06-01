@@ -22,7 +22,7 @@ export interface User {
 export interface TutorProfile {
   id: string;
   userId: string;
-  user: Pick<User, 'id' | 'name' | 'email' | 'avatar'>;
+  user: Pick<User, 'id' | 'name' | 'email' | 'avatar'> & { xp?: number; createdAt?: string };
   bio?: string;
   subjects: string[];
   hourlyRate?: number;
@@ -162,4 +162,14 @@ export interface Review {
   updatedAt: string;
   studentProfile?: StudentProfile;
   tutorProfile?: TutorProfile;
+}
+
+export interface ChatMessage {
+  id: string;
+  fromUserId: string;
+  toUserId: string;
+  text: string;
+  read: boolean;
+  createdAt: string;
+  fromUser?: { id: string; name: string; avatar: string };
 }

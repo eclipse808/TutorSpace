@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   Box, Typography, Card, CardContent, Button, Chip, Avatar, Rating, Stack,
   Dialog, DialogTitle, DialogContent, DialogActions, Alert, Grid, Divider,
-  ToggleButtonGroup, ToggleButton, CircularProgress, TextField, LinearProgress,
+  ToggleButtonGroup, ToggleButton, CircularProgress, TextField,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
@@ -12,13 +12,13 @@ import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import BoltIcon from '@mui/icons-material/Bolt';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import StarIcon from '@mui/icons-material/Star';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import { TutorProfile as TutorProfileType } from '../../types';
 import { PageLoader } from '../../components/Common/LoadingSpinner';
 import { useAuthStore } from '../../store/authStore';
 import { format, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import api from '../../api/client';
+import { getTutorPublicBadge, getEarnedTutorBadges, isEliteTutor } from '../../utils/tutorBadges';
 
 const LAVENDER = '#7C5CBF';
 const LAVENDER_BG = '#F0EBF8';
@@ -52,44 +52,6 @@ interface TutorWithStats extends TutorProfileType {
   completedSessions?: number;
 }
 
-const TUTOR_XP_THRESHOLDS = [0, 200, 800, 2000, 5000, 12000];
-const TUTOR_LEVEL_NAMES = ['Новичок', 'Практик', 'Опытный', 'Эксперт', 'Мастер', 'Гуру'];
-const TUTOR_LEVEL_REWARDS = [
-  '',
-  '🏷️ Бейдж на профиле',
-  '🔍 Приоритет в поиске',
-  '✅ Статус "Проверенный"',
-  '⭐ Выделение в каталоге',
-  '👑 Элитный репетитор',
-];
-
-function getTutorLevel(xp: number) {
-  const idx = Math.max(0, TUTOR_XP_THRESHOLDS.filter((t) => xp >= t).length - 1);
-  const cur = TUTOR_XP_THRESHOLDS[idx];
-  const next = TUTOR_XP_THRESHOLDS[idx + 1] ?? null;
-  const progress = next ? Math.min(100, ((xp - cur) / (next - cur)) * 100) : 100;
-  return { level: idx + 1, name: TUTOR_LEVEL_NAMES[idx], reward: TUTOR_LEVEL_REWARDS[idx], next, cur, progress };
-}
-
-function getTutorBadges(
-  completed: number,
-  rating: number,
-  reviewCount: number,
-  createdAt?: string,
-) {
-  const badges: { icon: string; label: string }[] = [];
-  if (completed >= 1) badges.push({ icon: '🎓', label: 'Первое занятие' });
-  if (completed >= 10) badges.push({ icon: '🔟', label: 'Десятка' });
-  if (completed >= 50) badges.push({ icon: '🏆', label: 'Полсотни' });
-  if (completed >= 100) badges.push({ icon: '💯', label: 'Сотня' });
-  if (reviewCount >= 10) badges.push({ icon: '💬', label: '10 отзывов' });
-  if (rating >= 4.5 && reviewCount >= 3) badges.push({ icon: '⭐', label: 'Высокий рейтинг' });
-  if (rating >= 4.9 && reviewCount >= 5) badges.push({ icon: '🌟', label: 'Идеальный рейтинг' });
-  if (createdAt && Date.now() - new Date(createdAt).getTime() >= 365 * 24 * 60 * 60 * 1000) {
-    badges.push({ icon: '📅', label: 'Год на сайте' });
-  }
-  return badges;
-}
 
 export default function TutorProfile() {
   const { id } = useParams<{ id: string }>();
@@ -152,7 +114,7 @@ export default function TutorProfile() {
         tutorProfileId: tutor.id,
         scheduledAt,
         duration,
-        subject: subject || tutor.subjects[0],
+        subject: subject || tutor.subjects[0] || '',
       });
       setBookSuccess(true);
       setTimeout(() => { setBookingOpen(false); resetBooking(); navigate('/student/sessions'); }, 1800);
@@ -164,6 +126,10 @@ export default function TutorProfile() {
   if (loading) return <PageLoader />;
   if (!tutor) return <Box sx={{ textAlign: 'center', py: 10, color: 'text.secondary' }}>Репетитор не найден</Box>;
 
+  const elite = isEliteTutor(tutor.user?.xp ?? 0);
+  // Warm gold — consistent with Elite styling in catalog cards
+  const ELITE_GOLD = '#FFB300';
+
   return (
     <Box sx={{ maxWidth: 960, mx: 'auto' }}>
       <Button startIcon={<ArrowBackIcon />} onClick={() => navigate(-1)} sx={{ mb: 3, color: 'text.secondary' }}>
@@ -174,15 +140,17 @@ export default function TutorProfile() {
         {/* Main */}
         <Grid item xs={12} md={8}>
           <Stack spacing={3}>
-            <Card elevation={1}>
+            <Card elevation={elite ? 2 : 1} sx={elite ? { border: `1.5px solid ${ELITE_GOLD}`, boxShadow: `0 0 0 3px ${ELITE_GOLD}18` } : {}}>
               <CardContent>
                 <Stack direction="row" spacing={3} alignItems="flex-start">
                   {tutor.photoUrl ? (
                     <Box component="img" src={tutor.photoUrl} alt={tutor.user.name}
-                      sx={{ width: 88, height: 88, borderRadius: 3, objectFit: 'cover', flexShrink: 0 }} />
+                      sx={{ width: 88, height: 88, borderRadius: 3, objectFit: 'cover', flexShrink: 0,
+                        ...(elite && { outline: `2.5px solid ${ELITE_GOLD}`, outlineOffset: 2 }) }} />
                   ) : (
-                    <Avatar sx={{ width: 88, height: 88, bgcolor: LAVENDER_BG, color: LAVENDER, borderRadius: 3, fontSize: 24, fontWeight: 700, flexShrink: 0 }}>
-                      {tutor.user.avatar || tutor.user.name.slice(0, 2).toUpperCase()}
+                    <Avatar sx={{ width: 88, height: 88, bgcolor: LAVENDER_BG, color: LAVENDER, borderRadius: 3, fontSize: 24, fontWeight: 700, flexShrink: 0,
+                      ...(elite && { outline: `2.5px solid ${ELITE_GOLD}`, outlineOffset: 2 }) }}>
+                      {tutor.user?.avatar || tutor.user?.name?.slice(0, 2)?.toUpperCase() || '?'}
                     </Avatar>
                   )}
                   <Box sx={{ flex: 1 }}>
@@ -217,41 +185,29 @@ export default function TutorProfile() {
               </Card>
             )}
 
-            {/* Tutor motivation */}
+            {/* Достижения репетитора (публичные) */}
             {(() => {
-              const xp = (tutor as any).user?.xp ?? 0;
+              const xp = tutor.user?.xp ?? 0;
               const completed = tutor.completedSessions ?? 0;
-              const createdAt = (tutor as any).user?.createdAt;
-              const lvl = getTutorLevel(xp);
-              const badges = getTutorBadges(completed, tutor.rating, tutor.reviewCount, createdAt);
-              if (xp === 0 && badges.length === 0) return null;
+              const publicBadge = getTutorPublicBadge(xp);
+              const badges = getEarnedTutorBadges({
+                completed,
+                rating: tutor.rating,
+                reviewCount: tutor.reviewCount,
+                createdAt: tutor.user?.createdAt,
+              });
+              if (!publicBadge && badges.length === 0) return null;
               return (
                 <Card elevation={1}>
                   <CardContent sx={{ p: 2.5 }}>
                     <Stack direction="row" alignItems="center" spacing={1} mb={2}>
-                      <TrendingUpIcon sx={{ color: LAVENDER, fontSize: 20 }} />
-                      <Typography variant="h6" fontWeight={600}>Уровень репетитора</Typography>
+                      <StarIcon sx={{ color: '#f59e0b', fontSize: 20 }} />
+                      <Typography variant="h6" fontWeight={600}>Достижения</Typography>
                     </Stack>
-                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={3} alignItems={{ sm: 'center' }}>
-                      {xp > 0 && (
-                        <Box sx={{ flex: 1 }}>
-                          <Stack direction="row" alignItems="center" spacing={1.5} mb={1}>
-                            <Chip label={`${lvl.level} — ${lvl.name}`} size="small" sx={{ bgcolor: LAVENDER_BG, color: LAVENDER, fontWeight: 700 }} />
-                            <Chip label={`${xp} XP`} size="small" sx={{ bgcolor: '#F7F5FC', color: '#9B83CF' }} />
-                          </Stack>
-                          {lvl.reward && (
-                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>{lvl.reward}</Typography>
-                          )}
-                          <LinearProgress
-                            variant="determinate"
-                            value={lvl.progress}
-                            sx={{ height: 8, borderRadius: 4, bgcolor: '#EDE9F7', '& .MuiLinearProgress-bar': { bgcolor: LAVENDER, borderRadius: 4 } }}
-                          />
-                          {lvl.next && (
-                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                              До следующего уровня: {lvl.next - xp} XP
-                            </Typography>
-                          )}
+                    <Stack spacing={2}>
+                      {publicBadge && (
+                        <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1, px: 2, py: 1, borderRadius: 2, bgcolor: publicBadge.bgColor, border: `1px solid ${publicBadge.borderColor}`, alignSelf: 'flex-start' }}>
+                          <Typography variant="body2" fontWeight={700} sx={{ color: publicBadge.color }}>{publicBadge.label}</Typography>
                         </Box>
                       )}
                       {badges.length > 0 && (
@@ -285,7 +241,7 @@ export default function TutorProfile() {
                             src={r.studentProfile.photoUrl || undefined}
                             sx={{ width: 36, height: 36, bgcolor: LAVENDER_BG, color: LAVENDER, fontSize: 12, fontWeight: 700, textDecoration: 'none', cursor: 'pointer', transition: 'opacity 0.2s', '&:hover': { opacity: 0.75 } }}
                           >
-                            {r.studentProfile.user.name.slice(0, 2).toUpperCase()}
+                            {r.studentProfile?.user?.name?.slice(0, 2)?.toUpperCase() ?? '?'}
                           </Avatar>
                           <Box sx={{ flex: 1 }}>
                             <Stack direction="row" alignItems="center" spacing={1}>
@@ -371,7 +327,7 @@ export default function TutorProfile() {
 
       {/* Booking dialog */}
       <Dialog open={bookingOpen} onClose={() => { setBookingOpen(false); resetBooking(); }} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>Запись к {tutor.user.name.split(' ')[0]}</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700 }}>Запись к {tutor.user.name?.split(' ')?.[0] ?? ''}</DialogTitle>
         <DialogContent>
           {bookSuccess ? (
             <Box sx={{ textAlign: 'center', py: 4 }}>

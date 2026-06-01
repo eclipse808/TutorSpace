@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Box, Typography, Card, CardContent, Chip, Stack, Tabs, Tab, Avatar, Button,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField, Rating, Alert,
@@ -13,6 +13,8 @@ import MenuBookIcon from '@mui/icons-material/MenuBook';
 import RateReviewIcon from '@mui/icons-material/RateReview';
 import StarIcon from '@mui/icons-material/Star';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
+import BlockIcon from '@mui/icons-material/Block';
 import { Session } from '../../types';
 import { PageLoader } from '../../components/Common/LoadingSpinner';
 import { format, parseISO } from 'date-fns';
@@ -32,6 +34,7 @@ const LAVENDER = '#7C5CBF';
 type ReviewMap = Record<string, string>;
 
 export default function MySessions() {
+  const navigate = useNavigate();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState(0);
@@ -47,6 +50,10 @@ export default function MySessions() {
 
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState('');
+
+  const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState('');
 
   useEffect(() => {
     Promise.all([
@@ -100,6 +107,20 @@ export default function MySessions() {
     }
   };
 
+  const cancelSession = async (sessionId: string) => {
+    setCancelling(true);
+    setCancelError('');
+    try {
+      await api.put(`/sessions/${sessionId}/status`, { status: 'CANCELLED' });
+      setSessions((prev) => prev.map((s) => s.id === sessionId ? { ...s, status: 'CANCELLED' } : s));
+      setCancelConfirmId(null);
+    } catch (err: any) {
+      setCancelError(err.response?.data?.error || 'Ошибка отмены');
+    } finally {
+      setCancelling(false);
+    }
+  };
+
   const deleteReview = async (tutorProfileId: string) => {
     const reviewId = reviewedTutors[tutorProfileId];
     if (!reviewId) return;
@@ -146,6 +167,10 @@ export default function MySessions() {
             const cfg = STATUS_CONFIG[session.status];
             const alreadyReviewed = reviewedTutors[session.tutorProfileId];
             const canReview = session.status === 'COMPLETED' && !alreadyReviewed;
+            const hoursUntil = (new Date(session.scheduledAt).getTime() - Date.now()) / (1000 * 60 * 60);
+            const canCancel = session.status === 'SCHEDULED' && hoursUntil >= 24;
+            const cancelTooLate = session.status === 'SCHEDULED' && hoursUntil < 24;
+            const cancelDeadline = new Date(new Date(session.scheduledAt).getTime() - 24 * 60 * 60 * 1000);
 
             return (
               <Card key={session.id} elevation={1} sx={{ transition: 'all 0.2s', '&:hover': { boxShadow: '0 4px 16px rgba(124,92,191,0.15)' } }}>
@@ -173,7 +198,20 @@ export default function MySessions() {
                           </Typography>
                           <Typography variant="body2" color="text.secondary">{session.subject}</Typography>
                         </Box>
-                        <Chip label={cfg.label} size="small" color={cfg.color} icon={cfg.icon} sx={{ fontWeight: 500 }} />
+                        <Stack direction="row" alignItems="center" spacing={0.5}>
+                          {session.tutorProfile?.user?.id && (
+                            <Tooltip title="Написать репетитору">
+                              <IconButton
+                                size="small"
+                                onClick={() => navigate(`/chat?with=${session.tutorProfile!.user.id}`)}
+                                sx={{ color: '#9B83CF', '&:hover': { color: LAVENDER, bgcolor: LAVENDER_BG } }}
+                              >
+                                <ChatBubbleOutlineIcon sx={{ fontSize: 18 }} />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                          <Chip label={cfg.label} size="small" color={cfg.color} icon={cfg.icon} sx={{ fontWeight: 500 }} />
+                        </Stack>
                       </Stack>
 
                       <Stack direction="row" spacing={3} sx={{ mt: 1.5 }}>
@@ -195,18 +233,40 @@ export default function MySessions() {
                         </Box>
                       )}
 
-                      {canReview && (
-                        <Box sx={{ mt: 1.5 }}>
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            startIcon={<RateReviewIcon />}
-                            onClick={() => openReview(session)}
-                            sx={{ borderColor: '#D5C9EE', color: LAVENDER, '&:hover': { bgcolor: '#F0EBF8', borderColor: LAVENDER } }}
-                          >
-                            Оставить отзыв
-                          </Button>
-                        </Box>
+                      {(canReview || canCancel || cancelTooLate) && (
+                        <Stack direction="row" spacing={1} sx={{ mt: 1.5 }} flexWrap="wrap">
+                          {canReview && (
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              startIcon={<RateReviewIcon />}
+                              onClick={() => openReview(session)}
+                              sx={{ borderColor: '#D5C9EE', color: LAVENDER, '&:hover': { bgcolor: '#F0EBF8', borderColor: LAVENDER } }}
+                            >
+                              Оставить отзыв
+                            </Button>
+                          )}
+                          {canCancel && (
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              color="error"
+                              startIcon={<CancelIcon />}
+                              onClick={() => { setCancelConfirmId(session.id); setCancelError(''); }}
+                            >
+                              Отменить
+                            </Button>
+                          )}
+                          {cancelTooLate && (
+                            <Tooltip title={`Отмена недоступна — до занятия менее 24 часов. Дедлайн отмены был ${format(cancelDeadline, 'd MMM, HH:mm', { locale: ru })}`}>
+                              <span>
+                                <Button size="small" variant="outlined" color="error" startIcon={<BlockIcon />} disabled>
+                                  Отмена недоступна
+                                </Button>
+                              </span>
+                            </Tooltip>
+                          )}
+                        </Stack>
                       )}
 
                       {alreadyReviewed && (
@@ -232,6 +292,29 @@ export default function MySessions() {
           })}
         </Stack>
       )}
+
+      {/* Cancel session dialog */}
+      <Dialog open={Boolean(cancelConfirmId)} onClose={() => !cancelling && setCancelConfirmId(null)} maxWidth="xs" fullWidth>
+        <DialogTitle fontWeight={700}>Отменить занятие?</DialogTitle>
+        <DialogContent>
+          {cancelError && <Alert severity="error" sx={{ mb: 2 }}>{cancelError}</Alert>}
+          <Typography variant="body2" color="text.secondary">
+            Занятие будет отменено. Это действие нельзя отменить.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 3, gap: 1 }}>
+          <Button variant="outlined" onClick={() => setCancelConfirmId(null)} disabled={cancelling} sx={{ flex: 1 }}>Назад</Button>
+          <Button
+            variant="contained"
+            color="error"
+            disabled={cancelling}
+            onClick={() => cancelConfirmId && cancelSession(cancelConfirmId)}
+            sx={{ flex: 1 }}
+          >
+            {cancelling ? 'Отмена...' : 'Да, отменить'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Review dialog */}
       <Dialog open={Boolean(reviewSession)} onClose={closeReview} maxWidth="sm" fullWidth>

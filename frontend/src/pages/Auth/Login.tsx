@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   Box, Card, CardContent, TextField, Button, Typography, Alert,
   InputAdornment, IconButton, Chip, Divider, Stack,
+  Dialog, DialogTitle, DialogContent, DialogActions,
 } from '@mui/material';
 import SchoolIcon from '@mui/icons-material/School';
 import VisibilityIcon from '@mui/icons-material/Visibility';
@@ -26,6 +27,7 @@ export default function Login() {
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [forgotOpen, setForgotOpen] = useState(false);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -90,6 +92,16 @@ export default function Login() {
                     ),
                   }}
                 />
+                <Box sx={{ textAlign: 'right', mt: -1 }}>
+                  <Typography
+                    variant="caption"
+                    color="primary"
+                    sx={{ cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
+                    onClick={() => setForgotOpen(true)}
+                  >
+                    Забыли пароль?
+                  </Typography>
+                </Box>
                 <Button type="submit" variant="contained" size="large" fullWidth disabled={loading}>
                   {loading ? 'Вход...' : 'Войти'}
                 </Button>
@@ -121,6 +133,24 @@ export default function Login() {
           </Typography>
         </Typography>
       </Box>
+
+      <Dialog open={forgotOpen} onClose={() => setForgotOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle fontWeight={700}>Восстановление пароля</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7 }}>
+            Автоматическая отправка писем пока не настроена.
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1, lineHeight: 1.7 }}>
+            Для сброса пароля обратитесь к администратору:
+          </Typography>
+          <Typography variant="body2" fontWeight={600} color="primary" sx={{ mt: 0.5 }}>
+            admin@tutorspace.ru
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 3 }}>
+          <Button variant="contained" fullWidth onClick={() => setForgotOpen(false)}>Понятно</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

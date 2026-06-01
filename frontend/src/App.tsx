@@ -19,9 +19,11 @@ import EvaluateStudent from './pages/Tutor/EvaluateStudent';
 import TutorSetup from './pages/Tutor/TutorSetup';
 import PendingApproval from './pages/Tutor/PendingApproval';
 import TutorReviews from './pages/Tutor/TutorReviews';
+import TutorAchievements from './pages/Tutor/TutorAchievements';
 import StudentPublicProfile from './pages/Student/StudentPublicProfile';
 import StudentAchievements from './pages/Student/StudentAchievements';
 import AdminPanel from './pages/Admin/AdminPanel';
+import ChatPage from './pages/Chat/ChatPage';
 
 function ProtectedRoute({ children, role }: { children: React.ReactNode; role?: string | string[] }) {
   const { user } = useAuthStore();
@@ -34,6 +36,15 @@ function ProtectedRoute({ children, role }: { children: React.ReactNode; role?: 
       return <Navigate to="/tutor/dashboard" replace />;
     }
   }
+  return <>{children}</>;
+}
+
+// Chat route — accessible to students and APPROVED tutors only
+function ChatRoute({ children }: { children: React.ReactNode }) {
+  const { user } = useAuthStore();
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role === 'ADMIN') return <Navigate to="/admin" replace />;
+  if (user.role === 'TUTOR' && user.tutorStatus !== 'APPROVED') return <Navigate to="/tutor/pending" replace />;
   return <>{children}</>;
 }
 
@@ -81,6 +92,10 @@ export default function App() {
           <Route path="/tutor/students/:studentProfileId/progress" element={<TutorRoute><StudentProgress /></TutorRoute>} />
           <Route path="/tutor/evaluate/:sessionId" element={<TutorRoute><EvaluateStudent /></TutorRoute>} />
           <Route path="/tutor/reviews" element={<TutorRoute><TutorReviews /></TutorRoute>} />
+          <Route path="/tutor/achievements" element={<TutorRoute><TutorAchievements /></TutorRoute>} />
+
+          {/* Chat route */}
+          <Route path="/chat" element={<ChatRoute><ChatPage /></ChatRoute>} />
 
           {/* Admin routes */}
           <Route path="/admin" element={<ProtectedRoute role="ADMIN"><AdminPanel /></ProtectedRoute>} />

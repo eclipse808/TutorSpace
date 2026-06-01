@@ -11,10 +11,12 @@ import MenuBookIcon from '@mui/icons-material/MenuBook';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import PersonIcon from '@mui/icons-material/Person';
 import ForumIcon from '@mui/icons-material/Forum';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import { RadarData, HistoryData, Achievement, CompetencyCriteria } from '../../types';
 import CompetencyRadar from '../../components/Progress/CompetencyRadar';
 import HistoryLineChart from '../../components/Progress/HistoryLineChart';
 import HistoryBarChart from '../../components/Progress/HistoryBarChart';
+import ActivityChart from '../../components/Progress/ActivityChart';
 import AchievementCard from '../../components/Progress/AchievementCard';
 import { PageLoader } from '../../components/Common/LoadingSpinner';
 import api from '../../api/client';
@@ -43,6 +45,7 @@ export default function MyProgress() {
   const [historyData, setHistoryData] = useState<HistoryData | null>(null);
   const [earned, setEarned] = useState<Achievement[]>([]);
   const [locked, setLocked] = useState<Achievement[]>([]);
+  const [activityData, setActivityData] = useState<{ week: string; count: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [chartLoading, setChartLoading] = useState(false);
 
@@ -66,6 +69,7 @@ export default function MyProgress() {
         }
         setTutorNames(map);
       }),
+      api.get('/progress/activity').then((r) => setActivityData(r.data)).catch(() => {}),
     ]).finally(() => setLoading(false));
   }, []);
 
@@ -135,6 +139,18 @@ export default function MyProgress() {
         </Box>
       ) : (
         <Stack spacing={3}>
+          {/* Activity chart */}
+          <Card elevation={1}>
+            <CardContent sx={{ p: 3 }}>
+              <Stack direction="row" alignItems="center" spacing={1} mb={2}>
+                <CalendarMonthIcon sx={{ color: '#7C5CBF', fontSize: 20 }} />
+                <Typography variant="subtitle1" fontWeight={700}>Активность занятий</Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>— последние 12 недель</Typography>
+              </Stack>
+              <ActivityChart data={activityData} />
+            </CardContent>
+          </Card>
+
           {/* Subject selector */}
           <Card elevation={1}>
             <CardContent sx={{ pb: '16px !important' }}>

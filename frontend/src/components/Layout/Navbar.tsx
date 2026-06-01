@@ -17,7 +17,9 @@ import ShieldIcon from '@mui/icons-material/Shield';
 import LogoutIcon from '@mui/icons-material/Logout';
 import BoltIcon from '@mui/icons-material/Bolt';
 import RateReviewIcon from '@mui/icons-material/RateReview';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import NotificationsIcon from '@mui/icons-material/Notifications';
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import InfoIcon from '@mui/icons-material/Info';
 import WarningIcon from '@mui/icons-material/Warning';
@@ -54,6 +56,7 @@ export default function Navbar() {
   const [notifLoading, setNotifLoading] = useState(false);
   const [markingAll, setMarkingAll] = useState(false);
   const [profilePhoto, setProfilePhoto] = useState('');
+  const [chatUnread, setChatUnread] = useState(0);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -77,6 +80,17 @@ export default function Navbar() {
     const interval = setInterval(fetchNotifications, 30000);
     return () => clearInterval(interval);
   }, [fetchNotifications]);
+
+  useEffect(() => {
+    if (!user || user.role === 'ADMIN') return;
+    if (user.role === 'TUTOR' && user.tutorStatus !== 'APPROVED') return;
+    const fetchChatUnread = async () => {
+      try { const { data } = await api.get('/chat/unread'); setChatUnread(data.count); } catch {}
+    };
+    fetchChatUnread();
+    const id = setInterval(fetchChatUnread, 30000);
+    return () => clearInterval(id);
+  }, [user]);
 
   const openNotifPanel = async (e: React.MouseEvent<HTMLElement>) => {
     setNotifAnchor(e.currentTarget);
@@ -128,6 +142,7 @@ export default function Navbar() {
     { to: '/tutor/goals', label: 'Цели учеников', icon: <TrackChangesIcon fontSize="small" /> },
     { to: '/tutor/criteria', label: 'Критерии', icon: <MenuBookIcon fontSize="small" /> },
     { to: '/tutor/reviews', label: 'Отзывы', icon: <RateReviewIcon fontSize="small" /> },
+    { to: '/tutor/achievements', label: 'Достижения', icon: <EmojiEventsIcon fontSize="small" /> },
   ];
   const adminLinks = [
     { to: '/admin', label: 'Заявки', icon: <ShieldIcon fontSize="small" /> },
@@ -191,6 +206,17 @@ export default function Navbar() {
                   />
                 )}
 
+                {/* Chat icon — hidden for non-approved tutors */}
+                {user.role !== 'ADMIN' && !(user.role === 'TUTOR' && user.tutorStatus !== 'APPROVED') && (
+                  <IconButton size="small" component={Link} to="/chat"
+                    sx={{ color: chatUnread > 0 ? LAVENDER : '#9B83CF', '&:hover': { bgcolor: LAVENDER_BG } }}>
+                    <Badge badgeContent={chatUnread || null} color="error" max={9}
+                      sx={{ '& .MuiBadge-badge': { fontSize: 10, minWidth: 16, height: 16, top: 2, right: 2 } }}>
+                      <ChatBubbleOutlineIcon fontSize="small" />
+                    </Badge>
+                  </IconButton>
+                )}
+
                 {/* Notification bell */}
                 <IconButton size="small" onClick={openNotifPanel}
                   sx={{ color: unreadCount > 0 ? LAVENDER : '#9B83CF', '&:hover': { bgcolor: LAVENDER_BG } }}>
@@ -229,6 +255,15 @@ export default function Navbar() {
         {/* Mobile */}
         {isMobile && (
           <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            {user && user.role !== 'ADMIN' && !(user.role === 'TUTOR' && user.tutorStatus !== 'APPROVED') && (
+              <IconButton size="small" component={Link} to="/chat"
+                sx={{ color: chatUnread > 0 ? LAVENDER : '#9B83CF', '&:hover': { bgcolor: LAVENDER_BG } }}>
+                <Badge badgeContent={chatUnread || null} color="error" max={9}
+                  sx={{ '& .MuiBadge-badge': { fontSize: 10, minWidth: 16, height: 16, top: 2, right: 2 } }}>
+                  <ChatBubbleOutlineIcon fontSize="small" />
+                </Badge>
+              </IconButton>
+            )}
             {user && (
               <IconButton size="small" onClick={openNotifPanel}
                 sx={{ color: unreadCount > 0 ? LAVENDER : '#9B83CF' }}>

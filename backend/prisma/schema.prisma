@@ -22,7 +22,10 @@ model User {
 
   tutorProfile   TutorProfile?
   studentProfile StudentProfile?
-  notifications  Notification[]
+  notifications    Notification[]
+  sentMessages     ChatMessage[] @relation("ChatFrom")
+  receivedMessages ChatMessage[] @relation("ChatTo")
+  adminLogs        AdminLog[]
 }
 
 enum Role {
@@ -61,11 +64,14 @@ model TutorProfile {
 }
 
 model StudentProfile {
-  id       String  @id @default(cuid())
-  userId   String  @unique
-  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  grade    String?
-  photoUrl String?
+  id             String  @id @default(cuid())
+  userId         String  @unique
+  user           User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  grade          String?
+  learningGoal   String?
+  photoUrl       String?
+  equippedFrame  Int?
+  equippedBanner Int?
 
   sessions            Session[]
   competencyScores    CompetencyScore[]
@@ -85,8 +91,8 @@ model Session {
   notes            String?
   createdAt        DateTime      @default(now())
 
-  tutorProfile     TutorProfile    @relation(fields: [tutorProfileId], references: [id])
-  studentProfile   StudentProfile  @relation(fields: [studentProfileId], references: [id])
+  tutorProfile     TutorProfile    @relation(fields: [tutorProfileId],   references: [id], onDelete: Cascade)
+  studentProfile   StudentProfile  @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
   competencyScores CompetencyScore[]
   review           Review?
 }
@@ -251,7 +257,33 @@ model Review {
 
   tutorProfile   TutorProfile   @relation(fields: [tutorProfileId], references: [id], onDelete: Cascade)
   studentProfile StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
-  session        Session?       @relation(fields: [sessionId], references: [id])
+  session        Session?       @relation(fields: [sessionId], references: [id], onDelete: SetNull)
 
   @@unique([studentProfileId, tutorProfileId])
+}
+
+model ChatMessage {
+  id         String   @id @default(cuid())
+  fromUserId String
+  toUserId   String
+  text       String
+  read       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  fromUser User @relation("ChatFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser   User @relation("ChatTo",   fields: [toUserId],   references: [id], onDelete: Cascade)
+}
+
+// Журнал действий администратора — только добавление, не редактируется через приложение
+model AdminLog {
+  id         String   @id @default(cuid())
+  adminId    String
+  action     String   // TUTOR_APPROVED, TUTOR_REJECTED, TUTOR_SUSPENDED, SUBJECT_APPROVED, SUBJECT_REJECTED, PROFILE_APPROVED, PROFILE_REJECTED
+  targetType String   // TUTOR, SUBJECT_REQUEST, PROFILE_CHANGE
+  targetId   String
+  targetName String   // Имя репетитора / название предмета — для читаемости
+  details    String?  // Доп. контекст (причина, заметка)
+  createdAt  DateTime @default(now())
+
+  admin User @relation(fields: [adminId], references: [id])
 }
